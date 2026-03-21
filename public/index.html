@@ -15,12 +15,11 @@
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
-            min-height: 100vh;
+            height: 100vh;
             overflow: hidden;
             position: relative;
         }
 
-        /* Animated background */
         body::before {
             content: '';
             position: absolute;
@@ -57,22 +56,11 @@
             max-width: 480px;
             width: 100%;
             animation: slideUpFade 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-            transition: transform 0.3s ease;
-        }
-
-        .join-card:hover {
-            transform: translateY(-5px);
         }
 
         @keyframes slideUpFade {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         .logo {
@@ -86,13 +74,6 @@
             -webkit-background-clip: text;
             background-clip: text;
             color: transparent;
-            display: inline-block;
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.05); }
         }
 
         .logo h1 {
@@ -135,16 +116,9 @@
             transform: translateY(-2px);
         }
 
-        .input-group input::placeholder {
-            color: #9ca3af;
-        }
-
-        .btn-primary {
+        .btn-primary, .btn-secondary {
             width: 100%;
             padding: 16px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
             border-radius: 24px;
             font-size: 16px;
             font-weight: 600;
@@ -152,24 +126,12 @@
             transition: all 0.3s ease;
             position: relative;
             overflow: hidden;
+            border: none;
         }
 
-        .btn-primary::before {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 0;
-            height: 0;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.3);
-            transform: translate(-50%, -50%);
-            transition: width 0.6s, height 0.6s;
-        }
-
-        .btn-primary:hover::before {
-            width: 300px;
-            height: 300px;
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
         }
 
         .btn-primary:hover {
@@ -178,16 +140,9 @@
         }
 
         .btn-secondary {
-            width: 100%;
-            padding: 16px;
             background: rgba(102, 126, 234, 0.1);
             color: #667eea;
             border: 2px solid rgba(102, 126, 234, 0.2);
-            border-radius: 24px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
         }
 
         .btn-secondary:hover {
@@ -228,7 +183,6 @@
             z-index: 1;
         }
 
-        /* Header */
         .header {
             background: rgba(10, 10, 15, 0.8);
             backdrop-filter: blur(20px);
@@ -259,7 +213,7 @@
             background: rgba(255, 255, 255, 0.1);
             padding: 8px 16px;
             border-radius: 40px;
-            font-family: 'Monaco', monospace;
+            font-family: monospace;
             font-size: 16px;
             font-weight: 600;
             color: white;
@@ -348,20 +302,7 @@
             border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
-        .video-status {
-            position: absolute;
-            top: 16px;
-            right: 16px;
-            background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(10px);
-            border-radius: 40px;
-            padding: 4px 10px;
-            font-size: 11px;
-            color: white;
-            font-weight: 500;
-        }
-
-        /* Controls Bar - Modern Design */
+        /* Controls Bar */
         .controls {
             display: flex;
             justify-content: center;
@@ -387,25 +328,6 @@
             align-items: center;
             justify-content: center;
             position: relative;
-            overflow: hidden;
-        }
-
-        .control-btn::before {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 0;
-            height: 0;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.2);
-            transform: translate(-50%, -50%);
-            transition: width 0.4s, height 0.4s;
-        }
-
-        .control-btn:hover::before {
-            width: 100%;
-            height: 100%;
         }
 
         .control-btn:hover {
@@ -413,15 +335,7 @@
             background: rgba(255, 255, 255, 0.2);
         }
 
-        .control-btn:active {
-            transform: scale(0.95);
-        }
-
-        /* Active/Off States */
-        .control-btn.mic-off {
-            background: #ef4444;
-        }
-
+        .control-btn.mic-off,
         .control-btn.cam-off {
             background: #ef4444;
         }
@@ -432,11 +346,6 @@
 
         .control-btn.leave-btn {
             background: #ef4444;
-        }
-
-        .control-btn.leave-btn:hover {
-            background: #dc2626;
-            transform: scale(1.05);
         }
 
         /* Tooltip */
@@ -466,7 +375,7 @@
             opacity: 1;
         }
 
-        /* Toast Notification */
+        /* Toast */
         .toast {
             position: fixed;
             bottom: 100px;
@@ -485,7 +394,7 @@
             border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
-        /* Scrollbar Styling */
+        /* Scrollbar */
         .video-grid::-webkit-scrollbar {
             width: 6px;
         }
@@ -500,65 +409,20 @@
             border-radius: 10px;
         }
 
-        .video-grid::-webkit-scrollbar-thumb:hover {
-            background: rgba(102, 126, 234, 0.8);
-        }
-
-        /* Responsive */
         @media (max-width: 768px) {
             .join-card {
                 padding: 32px 24px;
-                margin: 16px;
             }
-
             .video-grid {
                 grid-template-columns: 1fr;
                 gap: 12px;
                 padding: 16px;
             }
-
             .control-btn {
                 width: 48px;
                 height: 48px;
                 font-size: 20px;
             }
-
-            .header {
-                padding: 12px 16px;
-            }
-
-            .room-code {
-                font-size: 12px;
-                padding: 6px 12px;
-            }
-
-            .icon-btn {
-                padding: 6px 12px;
-                font-size: 12px;
-            }
-
-            .participant-count {
-                font-size: 12px;
-                padding: 6px 12px;
-            }
-        }
-
-        /* Loading Animation */
-        .loading-spinner {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 40px;
-            height: 40px;
-            border: 3px solid rgba(255, 255, 255, 0.3);
-            border-top-color: #667eea;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-
-        @keyframes spin {
-            to { transform: translate(-50%, -50%) rotate(360deg); }
         }
     </style>
 </head>
@@ -592,16 +456,10 @@
             <div class="room-info">
                 <span class="room-label">Meeting code:</span>
                 <span class="room-code" id="displayRoomCode">XXXXXX</span>
-                <button class="icon-btn" id="copyCodeBtn">
-                    <span>📋</span> <span>Copy</span>
-                </button>
-                <button class="icon-btn" id="fullscreenBtn">
-                    <span>🖥️</span> <span>Fullscreen</span>
-                </button>
+                <button class="icon-btn" id="copyCodeBtn">📋 Copy</button>
+                <button class="icon-btn" id="fullscreenBtn">🖥️ Fullscreen</button>
             </div>
-            <div class="participant-count" id="participantCount">
-                <span>👥</span> 1 participant
-            </div>
+            <div class="participant-count" id="participantCount">👥 1 participant</div>
         </div>
 
         <div class="video-grid" id="videoGrid"></div>
@@ -615,7 +473,7 @@
     </div>
 
     <script>
-        // Configuration
+        // ==================== CONFIGURATION ====================
         const WS_URL = window.location.protocol === 'https:' 
             ? `wss://${window.location.host}` 
             : `ws://${window.location.host}`;
@@ -623,7 +481,7 @@
         let ws = null;
         let localStream = null;
         let screenStream = null;
-        let peerConnections = new Map();
+        let peerConnections = new Map(); // key: remoteUserId, value: { pc, participantId, userName }
         let currentRoomId = null;
         let userId = null;
         let userName = null;
@@ -646,6 +504,7 @@
         const usernameInput = document.getElementById('usernameInput');
         const participantCountSpan = document.getElementById('participantCount');
 
+        // ICE servers
         const configuration = {
             iceServers: [
                 { urls: 'stun:stun.l.google.com:19302' },
@@ -654,15 +513,14 @@
             ]
         };
 
+        // ==================== UTILITIES ====================
         function showToast(message, duration = 3000) {
-            const existingToast = document.querySelector('.toast');
-            if (existingToast) existingToast.remove();
-            
+            const existing = document.querySelector('.toast');
+            if (existing) existing.remove();
             const toast = document.createElement('div');
             toast.className = 'toast';
             toast.textContent = message;
             document.body.appendChild(toast);
-            
             setTimeout(() => toast.remove(), duration);
         }
 
@@ -674,30 +532,30 @@
             return Math.random().toString(36).substring(2, 10).toUpperCase();
         }
 
-        function toggleFullscreen() {
-            if (!document.fullscreenElement) {
-                meetingUI.requestFullscreen().catch(err => {
-                    showToast('Fullscreen not supported');
-                });
-                fullscreenBtn.innerHTML = '<span>📴</span> <span>Exit</span>';
+        // ==================== PERSISTENCE ====================
+        function saveMeetingState(roomId, name) {
+            if (roomId && name) {
+                localStorage.setItem('meetstream_room', roomId);
+                localStorage.setItem('meetstream_name', name);
             } else {
-                document.exitFullscreen();
-                fullscreenBtn.innerHTML = '<span>🖥️</span> <span>Fullscreen</span>';
+                localStorage.removeItem('meetstream_room');
+                localStorage.removeItem('meetstream_name');
             }
         }
 
-        document.addEventListener('fullscreenchange', () => {
-            if (document.fullscreenElement) {
-                fullscreenBtn.innerHTML = '<span>📴</span> <span>Exit</span>';
-            } else {
-                fullscreenBtn.innerHTML = '<span>🖥️</span> <span>Fullscreen</span>';
+        function loadSavedState() {
+            const savedRoom = localStorage.getItem('meetstream_room');
+            const savedName = localStorage.getItem('meetstream_name');
+            if (savedRoom && savedName) {
+                // Auto-join after a short delay to let page load
+                setTimeout(() => startMeeting(savedRoom, savedName, true), 500);
             }
-        });
+        }
 
+        // ==================== WEBRTC & SIGNALING ====================
         function connectWebSocket(roomId, userId, userName) {
             return new Promise((resolve, reject) => {
                 ws = new WebSocket(WS_URL);
-                
                 ws.onopen = () => {
                     ws.send(JSON.stringify({
                         type: 'join-room',
@@ -707,19 +565,12 @@
                     }));
                     resolve();
                 };
-                
                 ws.onmessage = async (event) => {
                     const data = JSON.parse(event.data);
                     await handleSignalingMessage(data);
                 };
-                
-                ws.onerror = (error) => {
-                    reject(error);
-                };
-                
-                ws.onclose = () => {
-                    showToast('Disconnected from server');
-                };
+                ws.onerror = (err) => reject(err);
+                ws.onclose = () => showToast('Disconnected from server');
             });
         }
 
@@ -729,8 +580,8 @@
                     await createPeerConnection(data.participantId, data.userId, data.userName, true);
                     break;
                 case 'existing-participants':
-                    for (const participant of data.participants) {
-                        await createPeerConnection(participant.participantId, participant.userId, participant.userName, true);
+                    for (const p of data.participants) {
+                        await createPeerConnection(p.participantId, p.userId, p.userName, true);
                     }
                     updateParticipantCount();
                     break;
@@ -757,6 +608,7 @@
             const pc = new RTCPeerConnection(configuration);
             peerConnections.set(remoteUserId, { pc, participantId, userName: remoteUserName });
             
+            // Add local tracks
             if (localStream) {
                 localStream.getTracks().forEach(track => {
                     pc.addTrack(track, localStream);
@@ -793,11 +645,9 @@
         async function handleOffer(data) {
             const peer = peerConnections.get(data.from);
             if (!peer) return;
-            
             await peer.pc.setRemoteDescription(new RTCSessionDescription(data.data.sdp));
             const answer = await peer.pc.createAnswer();
             await peer.pc.setLocalDescription(answer);
-            
             ws.send(JSON.stringify({
                 type: 'answer',
                 from: userId,
@@ -821,11 +671,11 @@
         }
 
         function addRemoteVideo(userId, userName, stream) {
-            let videoCard = document.getElementById(`video-${userId}`);
-            if (!videoCard) {
-                videoCard = document.createElement('div');
-                videoCard.className = 'video-card';
-                videoCard.id = `video-${userId}`;
+            let card = document.getElementById(`video-${userId}`);
+            if (!card) {
+                card = document.createElement('div');
+                card.className = 'video-card';
+                card.id = `video-${userId}`;
                 const video = document.createElement('video');
                 video.id = `remote-${userId}`;
                 video.autoplay = true;
@@ -833,13 +683,13 @@
                 const nameSpan = document.createElement('div');
                 nameSpan.className = 'participant-name';
                 nameSpan.textContent = userName || `User ${userId.slice(0,4)}`;
-                videoCard.appendChild(video);
-                videoCard.appendChild(nameSpan);
-                videoGrid.appendChild(videoCard);
+                card.appendChild(video);
+                card.appendChild(nameSpan);
+                videoGrid.appendChild(card);
             }
-            const video = videoCard.querySelector('video');
-            if (video.srcObject !== stream) {
-                video.srcObject = stream;
+            const videoElem = card.querySelector('video');
+            if (videoElem.srcObject !== stream) {
+                videoElem.srcObject = stream;
             }
         }
 
@@ -849,17 +699,15 @@
                 peer.pc.close();
                 peerConnections.delete(userId);
             }
-            const videoCard = document.getElementById(`video-${userId}`);
-            if (videoCard) videoCard.remove();
+            const card = document.getElementById(`video-${userId}`);
+            if (card) card.remove();
         }
 
+        // ==================== MEDIA CONTROLS (Fixed) ====================
         async function setupLocalMedia() {
             try {
-                localStream = await navigator.mediaDevices.getUserMedia({ 
-                    video: true, 
-                    audio: true 
-                });
-                
+                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                // Add local video card
                 const localCard = document.createElement('div');
                 localCard.className = 'video-card';
                 localCard.id = 'local-video';
@@ -876,77 +724,98 @@
                 localCard.appendChild(nameSpan);
                 videoGrid.insertBefore(localCard, videoGrid.firstChild);
                 
+                // Reset button styles
                 micBtn.classList.remove('mic-off');
                 camBtn.classList.remove('cam-off');
                 return true;
-            } catch (error) {
+            } catch (err) {
                 showToast('Please allow camera and microphone access');
                 return false;
             }
         }
 
-        function toggleCamera() {
+        // Replace camera track properly
+        async function toggleCamera() {
             if (!localStream) return;
             
             const videoTrack = localStream.getVideoTracks()[0];
-            if (videoTrack) {
-                if (videoTrack.enabled) {
-                    videoTrack.stop();
-                    localStream.removeTrack(videoTrack);
-                    camBtn.classList.add('cam-off');
-                    showToast('Camera off');
-                } else {
-                    navigator.mediaDevices.getUserMedia({ video: true })
-                        .then(newVideoStream => {
-                            const newVideoTrack = newVideoStream.getVideoTracks()[0];
-                            localStream.addTrack(newVideoTrack);
-                            
-                            const localVideo = document.getElementById('localVideo');
-                            if (localVideo) {
-                                const newStream = new MediaStream();
-                                localStream.getTracks().forEach(track => newStream.addTrack(track));
-                                localVideo.srcObject = newStream;
-                                localStream = newStream;
-                            }
-                            
-                            for (const [_, peer] of peerConnections) {
-                                const sender = peer.pc.getSenders().find(s => s.track?.kind === 'video');
-                                if (sender) sender.replaceTrack(newVideoTrack);
-                            }
-                            
-                            camBtn.classList.remove('cam-off');
-                            showToast('Camera on');
-                        })
-                        .catch(() => showToast('Could not access camera'));
+            if (videoTrack && videoTrack.enabled) {
+                // Turn off: stop track and remove
+                videoTrack.stop();
+                localStream.removeTrack(videoTrack);
+                camBtn.classList.add('cam-off');
+                showToast('Camera off');
+            } else {
+                // Turn on: get new stream and replace
+                try {
+                    const newStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    const newVideoTrack = newStream.getVideoTracks()[0];
+                    // Replace track in local stream
+                    const oldVideo = localStream.getVideoTracks()[0];
+                    if (oldVideo) {
+                        localStream.removeTrack(oldVideo);
+                    }
+                    localStream.addTrack(newVideoTrack);
+                    
+                    // Update local video element
+                    const localVideo = document.getElementById('localVideo');
+                    if (localVideo) {
+                        const newCombined = new MediaStream();
+                        localStream.getTracks().forEach(t => newCombined.addTrack(t));
+                        localVideo.srcObject = newCombined;
+                        localStream = newCombined;
+                    }
+                    
+                    // Replace in all peer connections
+                    for (const [_, peer] of peerConnections) {
+                        const sender = peer.pc.getSenders().find(s => s.track?.kind === 'video');
+                        if (sender) {
+                            await sender.replaceTrack(newVideoTrack);
+                        } else {
+                            peer.pc.addTrack(newVideoTrack, localStream);
+                        }
+                    }
+                    camBtn.classList.remove('cam-off');
+                    showToast('Camera on');
+                } catch (err) {
+                    showToast('Could not access camera');
                 }
             }
         }
 
-        function toggleMic() {
+        // Replace microphone track properly
+        async function toggleMic() {
             if (!localStream) return;
             
             const audioTrack = localStream.getAudioTracks()[0];
-            if (audioTrack) {
-                if (audioTrack.enabled) {
-                    audioTrack.stop();
-                    localStream.removeTrack(audioTrack);
-                    micBtn.classList.add('mic-off');
-                    showToast('Microphone off');
-                } else {
-                    navigator.mediaDevices.getUserMedia({ audio: true })
-                        .then(newAudioStream => {
-                            const newAudioTrack = newAudioStream.getAudioTracks()[0];
-                            localStream.addTrack(newAudioTrack);
-                            
-                            for (const [_, peer] of peerConnections) {
-                                const sender = peer.pc.getSenders().find(s => s.track?.kind === 'audio');
-                                if (sender) sender.replaceTrack(newAudioTrack);
-                            }
-                            
-                            micBtn.classList.remove('mic-off');
-                            showToast('Microphone on');
-                        })
-                        .catch(() => showToast('Could not access microphone'));
+            if (audioTrack && audioTrack.enabled) {
+                // Turn off
+                audioTrack.stop();
+                localStream.removeTrack(audioTrack);
+                micBtn.classList.add('mic-off');
+                showToast('Microphone off');
+            } else {
+                // Turn on
+                try {
+                    const newStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    const newAudioTrack = newStream.getAudioTracks()[0];
+                    const oldAudio = localStream.getAudioTracks()[0];
+                    if (oldAudio) localStream.removeTrack(oldAudio);
+                    localStream.addTrack(newAudioTrack);
+                    
+                    // Update peer connections
+                    for (const [_, peer] of peerConnections) {
+                        const sender = peer.pc.getSenders().find(s => s.track?.kind === 'audio');
+                        if (sender) {
+                            await sender.replaceTrack(newAudioTrack);
+                        } else {
+                            peer.pc.addTrack(newAudioTrack, localStream);
+                        }
+                    }
+                    micBtn.classList.remove('mic-off');
+                    showToast('Microphone on');
+                } catch (err) {
+                    showToast('Could not access microphone');
                 }
             }
         }
@@ -955,17 +824,15 @@
             try {
                 screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
                 const screenTrack = screenStream.getVideoTracks()[0];
-                
                 for (const [_, peer] of peerConnections) {
                     const sender = peer.pc.getSenders().find(s => s.track?.kind === 'video');
                     if (sender) sender.replaceTrack(screenTrack);
                 }
-                
                 screenTrack.onended = () => stopScreenShare();
                 isScreenSharing = true;
                 screenBtn.classList.add('screen-active');
                 showToast('Screen sharing started');
-            } catch (error) {
+            } catch (err) {
                 showToast('Screen share cancelled');
             }
         }
@@ -977,14 +844,12 @@
             }
             isScreenSharing = false;
             screenBtn.classList.remove('screen-active');
-            
-            if (localStream) {
+            // Restore camera if it was on
+            if (localStream && localStream.getVideoTracks()[0]?.enabled) {
                 const cameraTrack = localStream.getVideoTracks()[0];
-                if (cameraTrack && cameraTrack.enabled) {
-                    for (const [_, peer] of peerConnections) {
-                        const sender = peer.pc.getSenders().find(s => s.track?.kind === 'video');
-                        if (sender) sender.replaceTrack(cameraTrack);
-                    }
+                for (const [_, peer] of peerConnections) {
+                    const sender = peer.pc.getSenders().find(s => s.track?.kind === 'video');
+                    if (sender && cameraTrack) sender.replaceTrack(cameraTrack);
                 }
             }
             showToast('Screen sharing stopped');
@@ -992,36 +857,35 @@
 
         function updateParticipantCount() {
             const count = peerConnections.size + 1;
-            participantCountSpan.innerHTML = `<span>👥</span> ${count} participant${count !== 1 ? 's' : ''}`;
+            participantCountSpan.innerHTML = `👥 ${count} participant${count !== 1 ? 's' : ''}`;
         }
 
+        // ==================== MEETING LIFECYCLE ====================
         async function leaveMeeting() {
             if (localStream) {
-                localStream.getTracks().forEach(track => track.stop());
+                localStream.getTracks().forEach(t => t.stop());
                 localStream = null;
             }
             if (screenStream) {
-                screenStream.getTracks().forEach(track => track.stop());
+                screenStream.getTracks().forEach(t => t.stop());
                 screenStream = null;
             }
-            
             for (const [_, peer] of peerConnections) {
                 peer.pc.close();
             }
             peerConnections.clear();
-            
             if (ws) {
-                ws.send(JSON.stringify({ type: 'leave-room', userName: userName }));
+                ws.send(JSON.stringify({ type: 'leave-room', userName }));
                 ws.close();
             }
-            
             videoGrid.innerHTML = '';
             joinScreen.style.display = 'flex';
             meetingUI.style.display = 'none';
+            saveMeetingState(null, null);
             showToast('You left the meeting');
         }
 
-        async function startMeeting(roomId, displayName) {
+        async function startMeeting(roomId, displayName, isAutoJoin = false) {
             currentRoomId = roomId;
             userId = generateUserId();
             userName = displayName;
@@ -1034,10 +898,15 @@
             
             joinScreen.style.display = 'none';
             meetingUI.style.display = 'flex';
-            showToast(`Welcome, ${userName}!`);
+            if (!isAutoJoin) {
+                saveMeetingState(roomId, displayName);
+                showToast(`Welcome, ${userName}!`);
+            } else {
+                showToast(`Rejoined meeting ${roomId}`);
+            }
         }
 
-        // Event listeners
+        // ==================== EVENT LISTENERS ====================
         createBtn.onclick = () => {
             const name = usernameInput.value.trim();
             if (!name) {
@@ -1051,7 +920,6 @@
         joinBtn.onclick = () => {
             const name = usernameInput.value.trim();
             const code = roomCodeInput.value.trim().toUpperCase();
-            
             if (!name) {
                 showToast('Please enter your name');
                 usernameInput.focus();
@@ -1070,7 +938,23 @@
             showToast('Meeting code copied!');
         };
         
-        fullscreenBtn.onclick = toggleFullscreen;
+        fullscreenBtn.onclick = () => {
+            if (!document.fullscreenElement) {
+                meetingUI.requestFullscreen();
+                fullscreenBtn.innerHTML = '📴 Exit';
+            } else {
+                document.exitFullscreen();
+                fullscreenBtn.innerHTML = '🖥️ Fullscreen';
+            }
+        };
+        document.addEventListener('fullscreenchange', () => {
+            if (document.fullscreenElement) {
+                fullscreenBtn.innerHTML = '📴 Exit';
+            } else {
+                fullscreenBtn.innerHTML = '🖥️ Fullscreen';
+            }
+        });
+        
         micBtn.onclick = toggleMic;
         camBtn.onclick = toggleCamera;
         screenBtn.onclick = () => {
@@ -1085,6 +969,9 @@
         roomCodeInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') joinBtn.click();
         });
+        
+        // Auto-join if previously in a meeting
+        loadSavedState();
     </script>
 </body>
 </html>
