@@ -898,6 +898,25 @@
         usernameInput.addEventListener('keypress', e => { if (e.key === 'Enter') createBtn.click(); });
         roomCodeInput.addEventListener('keypress', e => { if (e.key === 'Enter') joinBtn.click(); });
 
+        // Keyboard shortcuts for mic (1) and camera (2)
+        document.addEventListener('keydown', (event) => {
+            // Prevent default only if the key is "1" or "2" and no input/textarea is focused
+            const target = event.target;
+            const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+            if (!isInput) {
+                switch (event.key) {
+                    case '1':
+                        event.preventDefault();
+                        toggleMic();
+                        break;
+                    case '2':
+                        event.preventDefault();
+                        toggleCamera();
+                        break;
+                }
+            }
+        });
+        
         loadSavedState();
     </script>
 </body>
