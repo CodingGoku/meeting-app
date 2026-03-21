@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>MeetStream Pro - Fixed Remote Video</title>
+    <title>MeetStream Pro - Remote Video Fixed</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        /* (same CSS as before, no changes needed) */
+        /* (same CSS as before) */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Inter', sans-serif;
@@ -133,7 +133,7 @@
         let ws = null;
         let localStream = null;
         let screenStream = null;
-        let peerConnections = new Map(); // key: remoteUserId, value: { pc, participantId, userName }
+        let peerConnections = new Map();
         let currentRoomId = null;
         let userId = null;
         let userName = null;
@@ -155,11 +155,22 @@
         const usernameInput = document.getElementById('usernameInput');
         const participantCountSpan = document.getElementById('participantCount');
 
+        // IMPORTANT: TURN servers added for better connectivity
         const configuration = {
             iceServers: [
                 { urls: 'stun:stun.l.google.com:19302' },
                 { urls: 'stun:stun1.l.google.com:19302' },
-                { urls: 'stun:stun2.l.google.com:19302' }
+                { urls: 'stun:stun2.l.google.com:19302' },
+                {
+                    urls: 'turn:openrelay.metered.ca:80',
+                    username: 'openrelayproject',
+                    credential: 'openrelayproject'
+                },
+                {
+                    urls: 'turn:openrelay.metered.ca:443',
+                    username: 'openrelayproject',
+                    credential: 'openrelayproject'
+                }
             ]
         };
 
@@ -254,7 +265,6 @@
             const pc = new RTCPeerConnection(configuration);
             peerConnections.set(remoteUserId, { pc, participantId, userName: remoteUserName });
 
-            // Add local tracks if available
             if (localStream) {
                 localStream.getTracks().forEach(track => {
                     console.log(`Adding local track ${track.kind} to peer ${remoteUserName}`);
@@ -362,6 +372,8 @@
             const videoElem = card.querySelector('video');
             if (videoElem.srcObject !== stream) {
                 videoElem.srcObject = stream;
+                // Force play to ensure video starts
+                videoElem.play().catch(e => console.warn('Play failed:', e));
                 console.log(`Attached remote stream for ${userName}`);
             }
         }
@@ -410,20 +422,17 @@
             if (!localStream) return;
             const videoTrack = localStream.getVideoTracks()[0];
             if (videoTrack && videoTrack.enabled) {
-                // turn off
                 videoTrack.stop();
                 localStream.removeTrack(videoTrack);
                 camBtn.classList.add('cam-off');
                 showToast('Camera off');
             } else {
-                // turn on
                 try {
                     const newStream = await navigator.mediaDevices.getUserMedia({ video: true });
                     const newVideoTrack = newStream.getVideoTracks()[0];
                     const oldVideo = localStream.getVideoTracks()[0];
                     if (oldVideo) localStream.removeTrack(oldVideo);
                     localStream.addTrack(newVideoTrack);
-                    // update local video
                     const localVideo = document.getElementById('localVideo');
                     if (localVideo) {
                         const newCombined = new MediaStream();
@@ -431,7 +440,6 @@
                         localVideo.srcObject = newCombined;
                         localStream = newCombined;
                     }
-                    // update all peers
                     for (const [_, peer] of peerConnections) {
                         const sender = peer.pc.getSenders().find(s => s.track?.kind === 'video');
                         if (sender) {
@@ -463,7 +471,6 @@
                     const oldAudio = localStream.getAudioTracks()[0];
                     if (oldAudio) localStream.removeTrack(oldAudio);
                     localStream.addTrack(newAudioTrack);
-                    // update all peers
                     for (const [_, peer] of peerConnections) {
                         const sender = peer.pc.getSenders().find(s => s.track?.kind === 'audio');
                         if (sender) {
