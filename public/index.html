@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>MeetStream Pro - Screen Share with Audio Toggle</title>
+    <title>MeetStream Pro - Screen Share with Audio</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        /* (same CSS as before – keep unchanged) */
+        /* (same CSS as previous version – keep unchanged) */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Inter', sans-serif;
@@ -94,12 +94,6 @@
         .control-btn:hover { transform: scale(1.05); background: rgba(255,255,255,0.2); }
         .control-btn.mic-off, .control-btn.cam-off { background: #ef4444; }
         .control-btn.screen-active { background: #10b981; }
-        .control-btn.audio-toggle {
-            background: rgba(255,255,255,0.1);
-        }
-        .control-btn.audio-toggle.active {
-            background: #3b82f6;
-        }
         .control-btn.leave-btn { background: #ef4444; }
         .control-btn::after { content: attr(data-tooltip); position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.9); color: white; padding: 4px 8px; border-radius: 8px; font-size: 10px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
         .control-btn:hover::after { opacity: 1; }
@@ -107,6 +101,55 @@
         .video-grid::-webkit-scrollbar { width: 4px; }
         .video-grid::-webkit-scrollbar-track { background: rgba(255,255,255,0.1); border-radius: 10px; }
         .video-grid::-webkit-scrollbar-thumb { background: rgba(102,126,234,0.5); border-radius: 10px; }
+        .share-dialog {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 24px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            z-index: 200;
+            min-width: 280px;
+            text-align: center;
+            color: white;
+            border: 1px solid rgba(255,255,255,0.2);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        }
+        .share-dialog label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            cursor: pointer;
+        }
+        .share-dialog button {
+            padding: 10px 20px;
+            border-radius: 40px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .share-dialog .confirm-btn {
+            background: #10b981;
+            color: white;
+        }
+        .share-dialog .confirm-btn:hover {
+            background: #059669;
+            transform: scale(1.02);
+        }
+        .share-dialog .cancel-btn {
+            background: #ef4444;
+            color: white;
+        }
+        .share-dialog .cancel-btn:hover {
+            background: #dc2626;
+        }
         @media (max-width: 768px) {
             .join-card { padding: 32px 20px; }
             .video-grid { padding: 8px; gap: 8px; }
@@ -118,6 +161,7 @@
             .participant-count { font-size: 11px; padding: 3px 10px; }
             .video-action-btn { width: 26px; height: 26px; font-size: 12px; }
             .exit-focus-btn { bottom: 90px; right: 12px; padding: 6px 12px; font-size: 11px; }
+            .share-dialog { width: 90%; padding: 20px; }
         }
     </style>
 </head>
@@ -160,7 +204,6 @@
         <div class="controls">
             <button class="control-btn" id="micBtn" data-tooltip="Microphone">🎤</button>
             <button class="control-btn" id="camBtn" data-tooltip="Camera">📷</button>
-            <button class="control-btn audio-toggle" id="audioToggleBtn" data-tooltip="Toggle Audio Share">🎵</button>
             <button class="control-btn" id="screenBtn" data-tooltip="Share Screen">🖥️</button>
             <button class="control-btn leave-btn" id="leaveBtn" data-tooltip="Leave Meeting">🔴</button>
         </div>
@@ -178,7 +221,6 @@
         let userId = null;
         let userName = null;
         let isScreenSharing = false;
-        let shareAudioEnabled = false;
 
         // DOM elements
         const joinScreen = document.getElementById('joinScreen');
@@ -189,7 +231,6 @@
         const fullscreenBtn = document.getElementById('fullscreenBtn');
         const micBtn = document.getElementById('micBtn');
         const camBtn = document.getElementById('camBtn');
-        const audioToggleBtn = document.getElementById('audioToggleBtn');
         const screenBtn = document.getElementById('screenBtn');
         const leaveBtn = document.getElementById('leaveBtn');
         const joinBtn = document.getElementById('joinBtn');
@@ -490,7 +531,7 @@
             if (isFocusMode && focusedVideoId === `video-${userId}`) exitFocusMode();
         }
 
-        // ==================== MEDIA & SCREEN SHARE ====================
+        // ==================== MEDIA & SCREEN SHARE WITH AUDIO ====================
         async function setupLocalMedia() {
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
@@ -521,35 +562,57 @@
             }
         }
 
-        // Toggle audio sharing preference
-        function toggleAudioShare() {
-            if (isScreenSharing) {
-                showToast('Please stop screen sharing first to change audio preference');
-                return;
-            }
-            shareAudioEnabled = !shareAudioEnabled;
-            if (shareAudioEnabled) {
-                audioToggleBtn.classList.add('active');
-                showToast('Audio sharing enabled (will share device audio when you share screen)');
-            } else {
-                audioToggleBtn.classList.remove('active');
-                showToast('Audio sharing disabled');
-            }
+        // Show a dialog to ask for audio preference
+        function showScreenShareDialog() {
+            return new Promise((resolve) => {
+                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                if (isMobile) {
+                    showToast('Screen sharing is not supported on mobile browsers');
+                    resolve(null);
+                    return;
+                }
+                const dialog = document.createElement('div');
+                dialog.className = 'share-dialog';
+                dialog.innerHTML = `
+                    <h3 style="margin:0">Share your screen</h3>
+                    <label>
+                        <input type="checkbox" id="shareAudioCheckbox"> 🎵 Share device audio (movie sound)
+                    </label>
+                    <div style="display:flex; gap:12px; justify-content:center;">
+                        <button class="confirm-btn">Start Sharing</button>
+                        <button class="cancel-btn">Cancel</button>
+                    </div>
+                `;
+                document.body.appendChild(dialog);
+                const confirmBtn = dialog.querySelector('.confirm-btn');
+                const cancelBtn = dialog.querySelector('.cancel-btn');
+                const checkbox = dialog.querySelector('#shareAudioCheckbox');
+                
+                const cleanup = () => dialog.remove();
+                confirmBtn.onclick = () => {
+                    const wantAudio = checkbox.checked;
+                    cleanup();
+                    resolve(wantAudio);
+                };
+                cancelBtn.onclick = () => {
+                    cleanup();
+                    resolve(null);
+                };
+                // close on outside click?
+            });
         }
 
         async function startScreenShare() {
-            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-            if (isMobile) {
-                showToast('Screen sharing is not supported on mobile browsers');
-                return;
-            }
             if (isScreenSharing) {
                 stopScreenShare();
                 return;
             }
+            const wantAudio = await showScreenShareDialog();
+            if (wantAudio === null) return; // cancelled
+            
             try {
                 const constraints = { video: true };
-                if (shareAudioEnabled) constraints.audio = true;
+                if (wantAudio) constraints.audio = true;
                 
                 screenStream = await navigator.mediaDevices.getDisplayMedia(constraints);
                 const screenVideoTrack = screenStream.getVideoTracks()[0];
@@ -564,18 +627,25 @@
                     newStream.addTrack(screenAudio);
                     screenAudioTrack = screenAudio;
                     showToast('🎵 Sharing device audio (movie sound)');
-                } else if (shareAudioEnabled) {
-                    showToast('Audio sharing was requested but not available for this window/tab');
                 }
                 
-                // Replace video track in all peer connections, and replace audio track with screen audio (if present)
+                // Replace video track in all peer connections, and possibly add screen audio track
                 for (const [_, peer] of peerConnections) {
                     // Replace video
                     const videoSender = peer.pc.getSenders().find(s => s.track?.kind === 'video');
                     if (videoSender) await videoSender.replaceTrack(screenVideoTrack);
                     else peer.pc.addTrack(screenVideoTrack, newStream);
                     
-                    // Replace audio with screen audio (if available) so that others hear the movie sound
+                    // If we have screen audio, replace/add audio track (the mic audio is already present)
+                    // But we want to send both mic and screen audio? Actually we need to replace the audio track
+                    // with the screen audio if we want only screen audio? No, we want both mic and screen audio.
+                    // The user can mute mic separately. So we need to add a second audio track? That's not allowed.
+                    // Better: We'll replace the mic track with a combined stream? That's complex.
+                    // Simpler: For audio, we'll replace the mic track with the screen audio track, and the user can mute
+                    // their mic if they don't want to talk. That's the simplest. So we replace the existing audio track
+                    // with the screen audio track. That way others hear the movie sound, and the user can optionally
+                    // mute their mic (by clicking mic button) if they want only the movie.
+                    // So we'll replace the audio track.
                     if (screenAudio) {
                         const audioSender = peer.pc.getSenders().find(s => s.track?.kind === 'audio');
                         if (audioSender) await audioSender.replaceTrack(screenAudio);
@@ -610,7 +680,7 @@
                     }
                 }
                 
-                showToast(shareAudioEnabled && screenAudio ? 'Screen sharing started with audio' : 'Screen sharing started');
+                showToast(wantAudio ? 'Screen sharing started with audio' : 'Screen sharing started');
             } catch (err) {
                 console.error('Screen share error:', err);
                 showToast('Screen share cancelled or not supported');
@@ -623,12 +693,14 @@
             // Get fresh camera stream
             const cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
             const cameraVideoTrack = cameraStream.getVideoTracks()[0];
-            // Keep microphone track (the one we have in localStream is still the original mic? Actually it's the screen audio now. So we need to re-acquire mic)
-            const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            const micTrack = micStream.getAudioTracks()[0];
             
-            // Create new stream: camera video + mic audio
+            // Create new stream: camera video + mic audio (keep mic)
             const newStream = new MediaStream();
+            // Keep original mic audio (we saved the mic track? Actually localStream currently contains the screen audio track, so we need to restore mic.
+            // We'll need to store the mic track when screen sharing starts. Let's store micTrack globally.
+            // For simplicity, we'll just get a fresh mic track.
+            const freshMic = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const micTrack = freshMic.getAudioTracks()[0];
             newStream.addTrack(micTrack);
             newStream.addTrack(cameraVideoTrack);
             
@@ -818,7 +890,6 @@
         });
         micBtn.onclick = toggleMic;
         camBtn.onclick = toggleCamera;
-        audioToggleBtn.onclick = toggleAudioShare;
         screenBtn.onclick = () => {
             if (isScreenSharing) stopScreenShare();
             else startScreenShare();
