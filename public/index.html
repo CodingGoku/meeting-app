@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MeetStream - Video Conference</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>MeetStream Pro - Professional Video Conferencing</title>
     <style>
         * {
             margin: 0;
@@ -15,14 +15,17 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
+            overflow: hidden;
         }
 
+        /* Join Screen */
         .join-container {
             display: flex;
             justify-content: center;
             align-items: center;
             min-height: 100vh;
             padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
 
         .join-card {
@@ -32,86 +35,172 @@
             box-shadow: 0 20px 60px rgba(0,0,0,0.3);
             max-width: 450px;
             width: 100%;
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         .join-card h1 {
             text-align: center;
-            margin-bottom: 30px;
-            color: #333;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
         }
 
-        input {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 16px;
+        .join-card .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .input-group {
             margin-bottom: 15px;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #667eea;
         }
 
         button {
             width: 100%;
-            padding: 12px;
+            padding: 14px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
-            border-radius: 8px;
+            border-radius: 10px;
             font-size: 16px;
             font-weight: bold;
             cursor: pointer;
-            margin-bottom: 10px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
         }
 
         .or-divider {
             text-align: center;
             margin: 20px 0;
             color: #999;
+            position: relative;
         }
 
+        .or-divider::before,
+        .or-divider::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            width: 45%;
+            height: 1px;
+            background: #e0e0e0;
+        }
+
+        .or-divider::before { left: 0; }
+        .or-divider::after { right: 0; }
+
+        /* Meeting UI */
         .meeting-ui {
             display: none;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background: #1a1a2e;
         }
 
+        /* Fullscreen Mode */
+        .meeting-ui:fullscreen {
+            background: #000;
+        }
+
+        .meeting-ui:-webkit-full-screen {
+            background: #000;
+        }
+
+        /* Header */
         .header {
-            background: white;
-            padding: 20px;
-            margin: 20px;
-            border-radius: 10px;
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(10px);
+            padding: 15px 25px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
             gap: 15px;
+            z-index: 10;
+        }
+
+        .room-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
         }
 
         .room-code {
-            background: #f0f0f0;
+            background: rgba(255,255,255,0.2);
             padding: 8px 15px;
             border-radius: 8px;
             font-family: monospace;
             font-size: 18px;
             font-weight: bold;
+            color: white;
         }
 
-        .copy-btn {
+        .copy-btn, .fullscreen-btn {
             width: auto;
             padding: 8px 20px;
+            background: rgba(255,255,255,0.2);
             margin: 0;
         }
 
+        .participant-count {
+            background: rgba(102,126,234,0.8);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+
+        /* Video Grid */
         .video-grid {
+            flex: 1;
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
             gap: 20px;
             padding: 20px;
+            overflow-y: auto;
+            position: relative;
         }
 
         .video-card {
-            background: #1a1a1a;
-            border-radius: 10px;
+            background: #000;
+            border-radius: 12px;
             overflow: hidden;
             position: relative;
             aspect-ratio: 16/9;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            transition: transform 0.3s;
+        }
+
+        .video-card:hover {
+            transform: scale(1.02);
         }
 
         .video-card video {
@@ -122,78 +211,200 @@
 
         .participant-name {
             position: absolute;
-            bottom: 10px;
-            left: 10px;
-            background: rgba(0,0,0,0.6);
+            bottom: 12px;
+            left: 12px;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(5px);
             color: white;
-            padding: 4px 12px;
+            padding: 5px 12px;
             border-radius: 20px;
             font-size: 12px;
+            font-weight: 500;
+            z-index: 5;
         }
 
+        .video-status {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: rgba(0,0,0,0.7);
+            border-radius: 20px;
+            padding: 4px 8px;
+            font-size: 12px;
+            color: white;
+        }
+
+        /* Controls Bar */
         .controls {
             display: flex;
             justify-content: center;
-            gap: 15px;
+            gap: 20px;
             padding: 20px;
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(10px);
             flex-wrap: wrap;
+            z-index: 10;
         }
 
         .control-btn {
             width: 60px;
             height: 60px;
             border-radius: 50%;
-            background: white;
+            background: rgba(255,255,255,0.2);
             border: none;
             font-size: 24px;
             cursor: pointer;
             transition: all 0.3s;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .control-btn:hover {
+            transform: scale(1.1);
+            background: rgba(255,255,255,0.3);
+        }
+
+        /* Active/Off States */
+        .control-btn.mic-off {
+            background: #dc2626;
+            position: relative;
+        }
+
+        .control-btn.mic-off::after {
+            content: '🚫';
+            position: absolute;
+            font-size: 20px;
+            top: -5px;
+            right: -5px;
+            background: #dc2626;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .control-btn.cam-off {
+            background: #dc2626;
+            position: relative;
+        }
+
+        .control-btn.cam-off::after {
+            content: '🚫';
+            position: absolute;
+            font-size: 20px;
+            top: -5px;
+            right: -5px;
+            background: #dc2626;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .control-btn.screen-active {
+            background: #10b981;
         }
 
         .leave-btn {
-            background: #f44336;
+            background: #dc2626;
+        }
+
+        .leave-btn:hover {
+            background: #b91c1c;
+        }
+
+        /* Toast Notification */
+        .toast {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.9);
             color: white;
+            padding: 12px 24px;
+            border-radius: 50px;
+            font-size: 14px;
+            z-index: 1000;
+            animation: slideUp 0.3s ease;
+            pointer-events: none;
         }
 
-        .participant-count {
-            background: #667eea;
-            color: white;
-            padding: 5px 12px;
-            border-radius: 20px;
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
         }
 
-        .hidden {
-            display: none;
-        }
-
+        /* Responsive */
         @media (max-width: 768px) {
             .video-grid {
                 grid-template-columns: 1fr;
+                gap: 10px;
+                padding: 10px;
             }
+
+            .control-btn {
+                width: 50px;
+                height: 50px;
+                font-size: 20px;
+            }
+
+            .header {
+                padding: 10px 15px;
+            }
+
+            .room-code {
+                font-size: 14px;
+            }
+        }
+
+        /* Loading Indicator */
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 14px;
         }
     </style>
 </head>
 <body>
+    <!-- Join Screen -->
     <div id="joinScreen" class="join-container">
         <div class="join-card">
-            <h1>🎥 MeetStream</h1>
-            <input type="text" id="roomCode" placeholder="Enter meeting code">
+            <h1>🎥 MeetStream Pro</h1>
+            <div class="subtitle">Professional Video Conferencing</div>
+            <div class="input-group">
+                <input type="text" id="usernameInput" placeholder="Enter your name" autocomplete="off">
+            </div>
+            <div class="input-group">
+                <input type="text" id="roomCode" placeholder="Enter meeting code" autocomplete="off">
+            </div>
             <button id="joinBtn">Join Meeting</button>
-            <div class="or-divider">──────── or ────────</div>
+            <div class="or-divider">or</div>
             <button id="createBtn">Create New Meeting</button>
             <p style="text-align: center; margin-top: 20px; font-size: 12px; color: #999;">
                 🔒 Secure P2P Connection<br>
-                🌐 Works on any device
+                🌐 Works on any device<br>
+                🎥 HD Video & Screen Sharing
             </p>
         </div>
     </div>
 
+    <!-- Meeting UI -->
     <div id="meetingUI" class="meeting-ui">
         <div class="header">
-            <div>
-                <span>📞 Meeting Code: </span>
+            <div class="room-info">
+                <span style="color: white;">📞 Meeting Code:</span>
                 <span class="room-code" id="displayRoomCode">XXXXXX</span>
                 <button class="copy-btn" id="copyCodeBtn">📋 Copy</button>
+                <button class="fullscreen-btn" id="fullscreenBtn">🖥️ Fullscreen</button>
             </div>
             <div class="participant-count" id="participantCount">👥 1 participant</div>
         </div>
@@ -201,15 +412,15 @@
         <div class="video-grid" id="videoGrid"></div>
 
         <div class="controls">
-            <button class="control-btn" id="micBtn">🎤</button>
-            <button class="control-btn" id="camBtn">📷</button>
-            <button class="control-btn" id="screenBtn">🖥️</button>
-            <button class="control-btn leave-btn" id="leaveBtn">🔴</button>
+            <button class="control-btn" id="micBtn" title="Microphone">🎤</button>
+            <button class="control-btn" id="camBtn" title="Camera">📷</button>
+            <button class="control-btn" id="screenBtn" title="Share Screen">🖥️</button>
+            <button class="control-btn leave-btn" id="leaveBtn" title="Leave Meeting">🔴</button>
         </div>
     </div>
 
     <script>
-        // Auto-detect WebSocket URL based on current page
+        // Configuration
         const WS_URL = window.location.protocol === 'https:' 
             ? `wss://${window.location.host}` 
             : `ws://${window.location.host}`;
@@ -220,13 +431,18 @@
         let peerConnections = new Map();
         let currentRoomId = null;
         let userId = null;
+        let userName = null;
         let isScreenSharing = false;
+        let localVideoEnabled = true;
+        let localAudioEnabled = true;
 
+        // DOM elements
         const joinScreen = document.getElementById('joinScreen');
         const meetingUI = document.getElementById('meetingUI');
         const videoGrid = document.getElementById('videoGrid');
         const displayRoomCode = document.getElementById('displayRoomCode');
         const copyCodeBtn = document.getElementById('copyCodeBtn');
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
         const micBtn = document.getElementById('micBtn');
         const camBtn = document.getElementById('camBtn');
         const screenBtn = document.getElementById('screenBtn');
@@ -234,6 +450,7 @@
         const joinBtn = document.getElementById('joinBtn');
         const createBtn = document.getElementById('createBtn');
         const roomCodeInput = document.getElementById('roomCode');
+        const usernameInput = document.getElementById('usernameInput');
         const participantCountSpan = document.getElementById('participantCount');
 
         const configuration = {
@@ -244,6 +461,19 @@
             ]
         };
 
+        // Helper Functions
+        function showToast(message, duration = 3000) {
+            const existingToast = document.querySelector('.toast');
+            if (existingToast) existingToast.remove();
+            
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => toast.remove(), duration);
+        }
+
         function generateUserId() {
             return Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
         }
@@ -252,7 +482,30 @@
             return Math.random().toString(36).substring(2, 10).toUpperCase();
         }
 
-        function connectWebSocket(roomId, userId) {
+        // Fullscreen functionality
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                meetingUI.requestFullscreen().catch(err => {
+                    console.error('Fullscreen error:', err);
+                    showToast('Fullscreen not supported');
+                });
+                fullscreenBtn.textContent = '📴 Exit';
+            } else {
+                document.exitFullscreen();
+                fullscreenBtn.textContent = '🖥️ Fullscreen';
+            }
+        }
+
+        document.addEventListener('fullscreenchange', () => {
+            if (document.fullscreenElement) {
+                fullscreenBtn.textContent = '📴 Exit';
+            } else {
+                fullscreenBtn.textContent = '🖥️ Fullscreen';
+            }
+        });
+
+        // WebSocket connection
+        function connectWebSocket(roomId, userId, userName) {
             return new Promise((resolve, reject) => {
                 ws = new WebSocket(WS_URL);
                 
@@ -261,7 +514,8 @@
                     ws.send(JSON.stringify({
                         type: 'join-room',
                         roomId: roomId,
-                        userId: userId
+                        userId: userId,
+                        userName: userName
                     }));
                     resolve();
                 };
@@ -278,19 +532,20 @@
                 
                 ws.onclose = () => {
                     console.log('WebSocket disconnected');
+                    showToast('Disconnected from server');
                 };
             });
         }
 
+        // Signaling handlers
         async function handleSignalingMessage(data) {
-            console.log('Received:', data.type);
             switch (data.type) {
                 case 'user-joined':
-                    await createPeerConnection(data.participantId, data.userId, true);
+                    await createPeerConnection(data.participantId, data.userId, data.userName, true);
                     break;
                 case 'existing-participants':
                     for (const participant of data.participants) {
-                        await createPeerConnection(participant.participantId, participant.userId, true);
+                        await createPeerConnection(participant.participantId, participant.userId, participant.userName, true);
                     }
                     updateParticipantCount();
                     break;
@@ -302,13 +557,14 @@
                 case 'user-left':
                     removePeerConnection(data.userId);
                     updateParticipantCount();
+                    showToast(`${data.userName || 'User'} left the meeting`);
                     break;
             }
         }
 
-        async function createPeerConnection(participantId, remoteUserId, isInitiator) {
+        async function createPeerConnection(participantId, remoteUserId, remoteUserName, isInitiator) {
             const pc = new RTCPeerConnection(configuration);
-            peerConnections.set(remoteUserId, { pc, participantId });
+            peerConnections.set(remoteUserId, { pc, participantId, userName: remoteUserName });
             
             if (localStream) {
                 localStream.getTracks().forEach(track => {
@@ -328,7 +584,16 @@
             };
             
             pc.ontrack = (event) => {
-                addRemoteVideo(remoteUserId, event.streams[0]);
+                addRemoteVideo(remoteUserId, remoteUserName, event.streams[0]);
+            };
+            
+            pc.onconnectionstatechange = () => {
+                if (pc.connectionState === 'connected') {
+                    console.log(`Connected to ${remoteUserName}`);
+                } else if (pc.connectionState === 'failed') {
+                    console.log(`Connection failed to ${remoteUserName}`);
+                    removePeerConnection(remoteUserId);
+                }
             };
             
             if (isInitiator) {
@@ -364,24 +629,27 @@
             }
         }
 
-        function addRemoteVideo(userId, stream) {
+        function addRemoteVideo(userId, userName, stream) {
             let videoCard = document.getElementById(`video-${userId}`);
             if (!videoCard) {
                 videoCard = document.createElement('div');
                 videoCard.className = 'video-card';
                 videoCard.id = `video-${userId}`;
                 const video = document.createElement('video');
+                video.id = `remote-${userId}`;
                 video.autoplay = true;
                 video.playsInline = true;
                 const nameSpan = document.createElement('div');
                 nameSpan.className = 'participant-name';
-                nameSpan.textContent = `User ${userId.slice(0,4)}`;
+                nameSpan.textContent = userName || `User ${userId.slice(0,4)}`;
                 videoCard.appendChild(video);
                 videoCard.appendChild(nameSpan);
                 videoGrid.appendChild(videoCard);
             }
             const video = videoCard.querySelector('video');
-            video.srcObject = stream;
+            if (video.srcObject !== stream) {
+                video.srcObject = stream;
+            }
         }
 
         function removePeerConnection(userId) {
@@ -392,31 +660,90 @@
             }
             const videoCard = document.getElementById(`video-${userId}`);
             if (videoCard) videoCard.remove();
+            updateParticipantCount();
         }
 
+        // Media handling
         async function setupLocalMedia() {
             try {
-                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                localStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: true, 
+                    audio: true 
+                });
                 
                 const localCard = document.createElement('div');
                 localCard.className = 'video-card';
                 localCard.id = 'local-video';
                 const video = document.createElement('video');
+                video.id = 'localVideo';
                 video.autoplay = true;
                 video.playsInline = true;
                 video.muted = true;
                 video.srcObject = localStream;
                 const nameSpan = document.createElement('div');
                 nameSpan.className = 'participant-name';
-                nameSpan.textContent = 'You';
+                nameSpan.textContent = `${userName} (You)`;
                 localCard.appendChild(video);
                 localCard.appendChild(nameSpan);
                 videoGrid.insertBefore(localCard, videoGrid.firstChild);
                 
+                localVideoEnabled = true;
+                localAudioEnabled = true;
+                
                 return true;
             } catch (error) {
-                alert('Please allow camera and microphone access');
+                console.error('Error accessing media devices:', error);
+                showToast('Please allow camera and microphone access');
                 return false;
+            }
+        }
+
+        function toggleMic() {
+            if (localStream) {
+                const audioTrack = localStream.getAudioTracks()[0];
+                if (audioTrack) {
+                    localAudioEnabled = !localAudioEnabled;
+                    audioTrack.enabled = localAudioEnabled;
+                    
+                    if (!localAudioEnabled) {
+                        micBtn.classList.add('mic-off');
+                        micBtn.style.background = '#dc2626';
+                    } else {
+                        micBtn.classList.remove('mic-off');
+                        micBtn.style.background = 'rgba(255,255,255,0.2)';
+                    }
+                    
+                    showToast(localAudioEnabled ? 'Microphone on' : 'Microphone off');
+                }
+            }
+        }
+
+        function toggleCamera() {
+            if (localStream) {
+                const videoTrack = localStream.getVideoTracks()[0];
+                if (videoTrack) {
+                    localVideoEnabled = !localVideoEnabled;
+                    videoTrack.enabled = localVideoEnabled;
+                    
+                    if (!localVideoEnabled) {
+                        camBtn.classList.add('cam-off');
+                        camBtn.style.background = '#dc2626';
+                        // Show black screen effect
+                        const localVideo = document.getElementById('localVideo');
+                        if (localVideo) {
+                            localVideo.style.opacity = '0.3';
+                        }
+                    } else {
+                        camBtn.classList.remove('cam-off');
+                        camBtn.style.background = 'rgba(255,255,255,0.2)';
+                        const localVideo = document.getElementById('localVideo');
+                        if (localVideo) {
+                            localVideo.style.opacity = '1';
+                        }
+                    }
+                    
+                    showToast(localVideoEnabled ? 'Camera on' : 'Camera off');
+                }
             }
         }
 
@@ -432,9 +759,12 @@
                 
                 screenTrack.onended = () => stopScreenShare();
                 isScreenSharing = true;
-                screenBtn.style.background = '#4caf50';
+                screenBtn.classList.add('screen-active');
+                screenBtn.style.background = '#10b981';
+                showToast('Screen sharing started');
             } catch (error) {
-                alert('Screen share cancelled or not supported');
+                console.error('Screen share error:', error);
+                showToast('Screen share cancelled or not supported');
             }
         }
 
@@ -444,35 +774,17 @@
                 screenStream = null;
             }
             isScreenSharing = false;
-            screenBtn.style.background = 'white';
+            screenBtn.classList.remove('screen-active');
+            screenBtn.style.background = 'rgba(255,255,255,0.2)';
             
-            if (localStream) {
+            if (localStream && localVideoEnabled) {
                 const cameraTrack = localStream.getVideoTracks()[0];
                 for (const [_, peer] of peerConnections) {
                     const sender = peer.pc.getSenders().find(s => s.track?.kind === 'video');
                     if (sender && cameraTrack) sender.replaceTrack(cameraTrack);
                 }
             }
-        }
-
-        function toggleMic() {
-            if (localStream) {
-                const audioTrack = localStream.getAudioTracks()[0];
-                if (audioTrack) {
-                    audioTrack.enabled = !audioTrack.enabled;
-                    micBtn.style.background = audioTrack.enabled ? 'white' : '#f44336';
-                }
-            }
-        }
-
-        function toggleCamera() {
-            if (localStream) {
-                const videoTrack = localStream.getVideoTracks()[0];
-                if (videoTrack) {
-                    videoTrack.enabled = !videoTrack.enabled;
-                    camBtn.style.background = videoTrack.enabled ? 'white' : '#f44336';
-                }
-            }
+            showToast('Screen sharing stopped');
         }
 
         function updateParticipantCount() {
@@ -482,7 +794,7 @@
 
         async function leaveMeeting() {
             if (ws) {
-                ws.send(JSON.stringify({ type: 'leave-room' }));
+                ws.send(JSON.stringify({ type: 'leave-room', userName: userName }));
                 ws.close();
             }
             if (localStream) localStream.getTracks().forEach(t => t.stop());
@@ -492,32 +804,60 @@
             videoGrid.innerHTML = '';
             joinScreen.style.display = 'flex';
             meetingUI.style.display = 'none';
+            showToast('You left the meeting');
         }
 
-        async function startMeeting(roomId) {
+        async function startMeeting(roomId, displayName) {
             currentRoomId = roomId;
             userId = generateUserId();
+            userName = displayName;
             displayRoomCode.textContent = roomId;
             
             const mediaOk = await setupLocalMedia();
             if (!mediaOk) return;
             
-            await connectWebSocket(roomId, userId);
+            await connectWebSocket(roomId, userId, userName);
             
             joinScreen.style.display = 'none';
-            meetingUI.style.display = 'block';
+            meetingUI.style.display = 'flex';
+            showToast(`Welcome, ${userName}!`);
         }
 
-        createBtn.onclick = () => startMeeting(generateRoomCode());
-        joinBtn.onclick = () => {
-            const code = roomCodeInput.value.trim().toUpperCase();
-            if (code) startMeeting(code);
-            else alert('Enter a meeting code');
+        // Event listeners
+        createBtn.onclick = () => {
+            const name = usernameInput.value.trim();
+            if (!name) {
+                showToast('Please enter your name first');
+                usernameInput.focus();
+                return;
+            }
+            const newRoom = generateRoomCode();
+            startMeeting(newRoom, name);
         };
+        
+        joinBtn.onclick = () => {
+            const name = usernameInput.value.trim();
+            const code = roomCodeInput.value.trim().toUpperCase();
+            
+            if (!name) {
+                showToast('Please enter your name');
+                usernameInput.focus();
+                return;
+            }
+            if (!code) {
+                showToast('Please enter a meeting code');
+                roomCodeInput.focus();
+                return;
+            }
+            startMeeting(code, name);
+        };
+        
         copyCodeBtn.onclick = () => {
             navigator.clipboard.writeText(currentRoomId);
-            alert('Meeting code copied!');
+            showToast('Meeting code copied!');
         };
+        
+        fullscreenBtn.onclick = toggleFullscreen;
         micBtn.onclick = toggleMic;
         camBtn.onclick = toggleCamera;
         screenBtn.onclick = () => {
@@ -525,6 +865,14 @@
             else startScreenShare();
         };
         leaveBtn.onclick = leaveMeeting;
+        
+        // Enter key support
+        usernameInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') createBtn.click();
+        });
+        roomCodeInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') joinBtn.click();
+        });
     </script>
 </body>
 </html>
