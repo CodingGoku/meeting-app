@@ -858,6 +858,76 @@
             }
         }
 
+        async function toggleScreenShareWithAudio() {
+            if (isScreenSharing) {
+                await stopScreenShare();
+            } else {
+                // Start screen share with audio
+                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                if (isMobile) {
+                    showToast('Screen sharing is not supported on mobile browsers');
+                    return;
+                }
+                try {
+                    const constraints = { video: true, audio: true };
+                    screenStream = await navigator.mediaDevices.getDisplayMedia(constraints);
+                    const screenVideoTrack = screenStream.getVideoTracks()[0];
+                    const screenAudio = screenStream.getAudioTracks()[0];
+                    
+                    // Build new outgoing stream: keep mic audio + screen video + screen audio
+                    const newStream = new MediaStream();
+                    localStream.getAudioTracks().forEach(track => newStream.addTrack(track));
+                    newStream.addTrack(screenVideoTrack);
+                    if (screenAudio) {
+                        newStream.addTrack(screenAudio);
+                        screenAudioTrack = screenAudio;
+                        showToast('🎵 Sharing device audio (movie sound)');
+                    }
+                    
+                    // Replace video track in all peer connections, and replace audio with screen audio
+                    for (const [_, peer] of peerConnections) {
+                        const videoSender = peer.pc.getSenders().find(s => s.track?.kind === 'video');
+                        if (videoSender) await videoSender.replaceTrack(screenVideoTrack);
+                        else peer.pc.addTrack(screenVideoTrack, newStream);
+                        
+                        if (screenAudio) {
+                            const audioSender = peer.pc.getSenders().find(s => s.track?.kind === 'audio');
+                            if (audioSender) await audioSender.replaceTrack(screenAudio);
+                            else peer.pc.addTrack(screenAudio, newStream);
+                        }
+                    }
+                    
+                    const oldVideo = localStream.getVideoTracks()[0];
+                    if (oldVideo) oldVideo.stop();
+                    localStream = newStream;
+                    
+                    const localVideo = document.getElementById('localVideo');
+                    if (localVideo) localVideo.srcObject = localStream;
+                    
+                    screenVideoTrack.onended = () => stopScreenShare();
+                    isScreenSharing = true;
+                    screenBtn.classList.add('screen-active');
+                    
+                    const localCard = document.getElementById('local-video');
+                    if (localCard) {
+                        let audioBadge = localCard.querySelector('.screen-audio-badge');
+                        if (!audioBadge && screenAudio) {
+                            audioBadge = document.createElement('div');
+                            audioBadge.className = 'participant-name screen-audio-badge';
+                            audioBadge.style.bottom = '40px';
+                            audioBadge.style.background = '#10b981';
+                            audioBadge.innerHTML = '🎵 Audio';
+                            localCard.appendChild(audioBadge);
+                        }
+                    }
+                    showToast('Screen sharing started with audio');
+                } catch (err) {
+                    console.error('Screen share error:', err);
+                    showToast('Screen share cancelled or not supported');
+                }
+            }
+        }
+
         // ==================== EVENT LISTENERS ====================
         createBtn.onclick = () => {
             const name = usernameInput.value.trim();
@@ -912,6 +982,10 @@
                     case '2':
                         event.preventDefault();
                         toggleCamera();
+                        break;
+                    case '3':
+                        event.preventDefault();
+                        toggleScreenShareWithAudio();
                         break;
                 }
             }
