@@ -10,7 +10,11 @@ const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
 
 // Store rooms with participant details
-const rooms = new Map(); // roomId -> Map of participantId -> { ws, userId, userName, joinedAt }
+const rooms = new Map(); // roomId -> Map of participantId -> participant
+const reactions = new Set(['👍', '👏', '❤️', '🎉', '😂', '😮']);
+const activityCooldowns = { 'chat-message': 400, reaction: 650, 'hand-raised': 250 };
+const maxChatLength = 500;
+const maxBufferedBytes = 64 * 1024;
 
 // Serve static files from 'public' folder
 const publicPath = path.join(__dirname, 'public');
@@ -63,8 +67,6 @@ console.log('WebSocket server created successfully');
 wss.on('connection', (ws, req) => {
     const participantId = uuidv4();
     let currentRoomId = null;
-    let currentUserId = null;
-    let currentUserName = null;
     const connectionTime = new Date();
 
     console.log(`[${new Date().toISOString()}] New WebSocket connection: ${participantId} from ${req.socket.remoteAddress}`);
@@ -80,24 +82,28 @@ wss.on('connection', (ws, req) => {
     ws.on('message', (message) => {
         try {
             const data = JSON.parse(message.toString());
-            console.log(`[${new Date().toISOString()}] Message from ${participantId}: ${data.type}`);
 
             switch (data.type) {
                 case 'join-room':
-                    handleJoinRoom(ws, participantId, data);
-                    currentRoomId = data.roomId;
-                    currentUserId = data.userId;
-                    currentUserName = data.userName;
+                    if (!currentRoomId && handleJoinRoom(ws, participantId, data)) {
+                        currentRoomId = data.roomId;
+                    }
                     break;
                     
                 case 'offer':
                 case 'answer':
                 case 'ice-candidate':
-                    forwardToParticipant(ws, data, currentRoomId);
+                    forwardToParticipant(participantId, data, currentRoomId);
+                    break;
+
+                case 'chat-message':
+                case 'reaction':
+                case 'hand-raised':
+                    broadcastRoomActivity(participantId, data, currentRoomId);
                     break;
                     
                 case 'leave-room':
-                    handleLeaveRoom(ws, participantId, currentRoomId);
+                    handleLeaveRoom(participantId, currentRoomId);
                     currentRoomId = null;
                     break;
                     
@@ -126,7 +132,7 @@ wss.on('connection', (ws, req) => {
     ws.on('close', (code, reason) => {
         console.log(`[${new Date().toISOString()}] WebSocket closed: ${participantId} - Code: ${code}, Reason: ${reason || 'No reason provided'}`);
         if (currentRoomId) {
-            handleLeaveRoom(ws, participantId, currentRoomId);
+            handleLeaveRoom(participantId, currentRoomId);
         }
     });
 
@@ -140,15 +146,17 @@ function handleJoinRoom(ws, participantId, data) {
     try {
         const { roomId, userId, userName } = data;
         
-        if (!roomId || !userId) {
-            console.error('Invalid join data:', data);
+        if (typeof roomId !== 'string' || !roomId.trim() || roomId.length > 128 ||
+            typeof userId !== 'string' || !userId.trim() || userId.length > 128 ||
+            (userName != null && (typeof userName !== 'string' || userName.length > 80))) {
             ws.send(JSON.stringify({
                 type: 'error',
                 message: 'Invalid join data'
             }));
-            return;
+            return false;
         }
 
+        const participantName = userName?.trim() || `User ${userId.slice(0, 4)}`;
         // Create room if it doesn't exist
         if (!rooms.has(roomId)) {
             rooms.set(roomId, new Map());
@@ -157,34 +165,28 @@ function handleJoinRoom(ws, participantId, data) {
         
         const room = rooms.get(roomId);
         
-        // Check if user already exists in room (reconnection)
-        let existingParticipantId = null;
+        // Keep a live participant's identity bound to their socket.
         for (const [pid, participant] of room.entries()) {
             if (participant.userId === userId) {
-                existingParticipantId = pid;
+                if (participant.ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'error',
+                        message: 'This participant is already in the meeting'
+                    }));
+                    return false;
+                }
+                removeParticipant(room, pid);
                 break;
             }
-        }
-        
-        if (existingParticipantId) {
-            // Remove existing connection
-            const oldParticipant = room.get(existingParticipantId);
-            if (oldParticipant.ws !== ws) {
-                try {
-                    oldParticipant.ws.close();
-                } catch (err) {
-                    console.error('Error closing old connection:', err);
-                }
-            }
-            room.delete(existingParticipantId);
-            console.log(`[${new Date().toISOString()}] Replaced existing connection for user ${userName || userId}`);
         }
         
         // Add new participant
         room.set(participantId, { 
             ws, 
             userId, 
-            userName: userName || `User ${userId.slice(0,4)}`,
+            userName: participantName,
+            raised: false,
+            lastActivity: {},
             joinedAt: new Date().toISOString()
         });
         
@@ -193,7 +195,8 @@ function handleJoinRoom(ws, participantId, data) {
             type: 'user-joined',
             participantId: participantId,
             userId: userId,
-            userName: userName || `User ${userId.slice(0,4)}`
+            userName: participantName,
+            raised: false
         };
         
         for (const [pid, participant] of room.entries()) {
@@ -213,7 +216,8 @@ function handleJoinRoom(ws, participantId, data) {
                 existingParticipants.push({ 
                     participantId: pid, 
                     userId: participant.userId,
-                    userName: participant.userName
+                    userName: participant.userName,
+                    raised: participant.raised
                 });
             }
         }
@@ -224,12 +228,14 @@ function handleJoinRoom(ws, participantId, data) {
                 participants: existingParticipants,
                 yourInfo: {
                     userId: userId,
-                    userName: userName || `User ${userId.slice(0,4)}`
+                    userName: participantName,
+                    raised: false
                 }
             }));
         }
         
         console.log(`[${new Date().toISOString()}] User ${userName || userId} joined room ${roomId}. Total participants: ${room.size}`);
+        return true;
         
     } catch (error) {
         console.error('Error in handleJoinRoom:', error);
@@ -239,42 +245,45 @@ function handleJoinRoom(ws, participantId, data) {
                 message: 'Failed to join room'
             }));
         }
+        return false;
     }
 }
 
-function handleLeaveRoom(ws, participantId, roomId) {
-    try {
-        if (!roomId || !rooms.has(roomId)) return;
-        
-        const room = rooms.get(roomId);
-        const participant = room.get(participantId);
-        
-        if (!participant) return;
-        
-        const leaveInfo = {
-            type: 'user-left',
-            userId: participant.userId,
-            userName: participant.userName
-        };
-        
-        // Notify all other participants
-        for (const [pid, p] of room.entries()) {
-            if (pid !== participantId && p.ws.readyState === WebSocket.OPEN) {
-                try {
-                    p.ws.send(JSON.stringify(leaveInfo));
-                } catch (err) {
-                    console.error('Error notifying about leave:', err);
-                }
+function removeParticipant(room, participantId) {
+    const participant = room.get(participantId);
+    if (!participant) return;
+
+    room.delete(participantId);
+    const payload = JSON.stringify({
+        type: 'user-left',
+        userId: participant.userId,
+        userName: participant.userName
+    });
+    for (const member of room.values()) {
+        if (member.ws.readyState === WebSocket.OPEN) {
+            try {
+                member.ws.send(payload);
+            } catch (error) {
+                console.error('Error notifying about leave:', error);
             }
         }
-        
-        room.delete(participantId);
+    }
+    return participant;
+}
+
+function handleLeaveRoom(participantId, roomId) {
+    try {
+        const room = rooms.get(roomId);
+        if (!room) return;
+
+        const participant = removeParticipant(room, participantId);
+        if (!participant) return;
         console.log(`[${new Date().toISOString()}] User ${participant.userName || participant.userId} left room ${roomId}. Remaining: ${room.size}`);
         
         // Delete empty rooms after 30 seconds (to allow for reconnections)
         if (room.size === 0) {
             setTimeout(() => {
-                if (rooms.has(roomId) && rooms.get(roomId).size === 0) {
+                if (rooms.get(roomId) === room && room.size === 0) {
                     rooms.delete(roomId);
                     console.log(`[${new Date().toISOString()}] Deleted empty room: ${roomId}`);
                 }
@@ -286,11 +295,51 @@ function handleLeaveRoom(ws, participantId, roomId) {
     }
 }
 
-function forwardToParticipant(ws, data, roomId) {
+function broadcastRoomActivity(participantId, data, roomId) {
+    const room = rooms.get(roomId);
+    const sender = room?.get(participantId);
+    if (!sender) return;
+
+    const { type } = data;
+    const now = Date.now();
+    if (now - (sender.lastActivity[type] ?? 0) < activityCooldowns[type]) return;
+
+    const message = { type, userId: sender.userId, userName: sender.userName };
+    switch (type) {
+        case 'chat-message': {
+            if (typeof data.text !== 'string' || data.text.length > maxChatLength) return;
+            const text = data.text.trim();
+            if (!text) return;
+            message.text = text;
+            message.timestamp = new Date(now).toISOString();
+            break;
+        }
+        case 'reaction':
+            if (!reactions.has(data.reaction)) return;
+            message.reaction = data.reaction;
+            break;
+        case 'hand-raised':
+            if (typeof data.raised !== 'boolean' || sender.raised === data.raised) return;
+            sender.raised = data.raised;
+            message.raised = sender.raised;
+            break;
+    }
+
+    sender.lastActivity[type] = now;
+    const payload = JSON.stringify(message);
+    for (const participant of room.values()) {
+        if (participant.ws.readyState === WebSocket.OPEN && participant.ws.bufferedAmount < maxBufferedBytes) {
+            participant.ws.send(payload);
+        }
+    }
+}
+
+function forwardToParticipant(participantId, data, roomId) {
     try {
-        if (!roomId || !rooms.has(roomId)) return;
-        
         const room = rooms.get(roomId);
+        const sender = room?.get(participantId);
+        if (!sender) return;
+
         let targetParticipant = null;
         
         // Find target participant
@@ -304,8 +353,8 @@ function forwardToParticipant(ws, data, roomId) {
         if (targetParticipant && targetParticipant.ws.readyState === WebSocket.OPEN) {
             targetParticipant.ws.send(JSON.stringify({
                 type: data.type,
-                from: data.from,
-                fromName: data.fromName,
+                from: sender.userId,
+                fromName: sender.userName,
                 data: data.data
             }));
         } else {
