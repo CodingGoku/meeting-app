@@ -7,8 +7,8 @@
   <meta name="description" content="Start or join a video meeting with MeetStream Pro.">
   <title>MeetStream Pro</title>
   <link rel="icon" href="assets/meetstream-icon.webp" type="image/webp">
-  <link rel="stylesheet" href="styles.css">
-  <script type="module" src="app.js"></script>
+  <link rel="stylesheet" href="styles.css?v=3">
+  <script type="module" src="app.js?v=3"></script>
 </head>
 <body>
   <main id="lobby" class="lobby-shell">
@@ -78,7 +78,9 @@
       <section class="stage" aria-label="Video stage">
         <div class="stage-bar">
           <span id="participant-count" class="stage-count"><span data-icon="people"></span><span id="count-label">1 participant</span></span>
-          <button id="fullscreen-button" type="button" class="icon-btn" aria-label="Toggle fullscreen" title="Toggle fullscreen" data-icon="fullscreen"></button>
+          <button id="enable-audio" type="button" class="secondary" hidden><span data-icon="volume"></span> Enable audio</button>
+          <button id="retry-media" type="button" class="secondary" hidden>Retry media</button>
+          <button id="fullscreen-button" type="button" class="icon-btn" aria-label="Enter full screen" title="Enter full screen (F)" data-icon="fullscreen"></button>
         </div>
         <div id="video-grid" class="video-grid"></div>
         <div id="stage-empty" class="stage-empty">
@@ -165,7 +167,13 @@
     <article class="video-tile">
       <video autoplay playsinline></video>
       <div class="avatar" aria-hidden="true"></div>
-      <div class="tile-meta"><span class="tile-name"></span><span class="tile-hand" aria-label="Hand raised" title="Hand raised" data-icon="hand" hidden></span></div>
+      <div class="tile-meta">
+        <span class="tile-name"></span>
+        <span class="tile-muted" aria-label="Microphone muted" title="Microphone muted" data-icon="micOff" hidden></span>
+        <span class="tile-sharing" aria-label="Sharing screen" title="Sharing screen" data-icon="screen" hidden></span>
+        <span class="tile-hand" aria-label="Hand raised" title="Hand raised" data-icon="hand" hidden></span>
+        <span class="tile-connection" hidden></span>
+      </div>
       <div class="tile-actions">
         <button class="icon-btn tile-pin" type="button" aria-label="Pin video" title="Pin video" aria-pressed="false" data-icon="pin"></button>
         <button class="icon-btn tile-fullscreen" type="button" aria-label="Fullscreen video" title="Fullscreen video" data-icon="fullscreen"></button>

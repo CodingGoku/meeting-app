@@ -4,6 +4,7 @@ const WebSocket = require('ws');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const fs = require('fs');
+const { createHmac } = require('crypto');
 
 const app = express();
 const server = http.createServer(app);
@@ -15,6 +16,52 @@ const reactions = new Set(['👍', '👏', '❤️', '🎉', '😂', '😮']);
 const activityCooldowns = { 'chat-message': 400, reaction: 650, 'hand-raised': 250 };
 const maxChatLength = 500;
 const maxBufferedBytes = 64 * 1024;
+const turnCredentialLifetime = 6 * 60 * 60;
+const turnConfig = readTurnConfig(process.env);
+
+function readTurnConfig({ TURN_URLS, TURN_SECRET, TURN_USERNAME, TURN_CREDENTIAL }) {
+    if (!TURN_URLS && !TURN_SECRET && !TURN_USERNAME && !TURN_CREDENTIAL) {
+        // Open Relay publishes these static-auth settings for shared use.
+        return {
+            urls: [
+                'turn:staticauth.openrelay.metered.ca:80?transport=udp',
+                'turn:staticauth.openrelay.metered.ca:443?transport=udp',
+                'turn:staticauth.openrelay.metered.ca:443?transport=tcp'
+            ],
+            secret: 'openrelayprojectsecret'
+        };
+    }
+
+    const urls = TURN_URLS?.split(',').map(url => url.trim());
+    const urlPattern = /^turns?:(?:\[[0-9a-f:.]+\]|[a-z0-9.-]+)(?::([0-9]{1,5}))?(?:\?transport=(?:udp|tcp))?$/i;
+    if (!urls?.length || !urls.every(url => {
+        const match = url.match(urlPattern);
+        return match && (!match[1] || (Number(match[1]) > 0 && Number(match[1]) <= 65535));
+    })) {
+        console.warn('TURN is disabled. Set TURN_URLS to valid comma-separated TURN URLs.');
+        return;
+    }
+    if (TURN_SECRET) return { urls, secret: TURN_SECRET };
+    if (TURN_USERNAME && TURN_CREDENTIAL) return { urls, username: TURN_USERNAME, credential: TURN_CREDENTIAL };
+
+    console.warn('TURN is disabled. Set TURN_SECRET or both TURN_USERNAME and TURN_CREDENTIAL.');
+}
+
+function getIceServers(participantId) {
+    if (!turnConfig) return;
+    const { urls, secret, username, credential } = turnConfig;
+    if (!secret) return [{ urls, username, credential }];
+
+    const expiresAt = Math.floor(Date.now() / 1000) + turnCredentialLifetime;
+    const temporaryUsername = `${expiresAt}:${participantId}`;
+    const temporaryCredential = createHmac('sha1', secret).update(temporaryUsername).digest('base64');
+    return [{ urls, username: temporaryUsername, credential: temporaryCredential }];
+}
+
+function parseMediaState(value) {
+    if (typeof value?.camera !== 'boolean' || typeof value.mic !== 'boolean' || typeof value.sharing !== 'boolean') return;
+    return { camera: value.camera, mic: value.mic, sharing: value.sharing };
+}
 
 // Serve static files from 'public' folder
 const publicPath = path.join(__dirname, 'public');
@@ -63,11 +110,27 @@ const wss = new WebSocket.Server({
 
 console.log('WebSocket server created successfully');
 
+const heartbeat = setInterval(() => {
+    for (const ws of wss.clients) {
+        if (ws.readyState !== WebSocket.OPEN) continue;
+        if (ws.isAlive) {
+            ws.isAlive = false;
+            ws.ping();
+        } else {
+            ws.terminate();
+        }
+    }
+}, 25000);
+heartbeat.unref();
+wss.on('close', () => clearInterval(heartbeat));
+
 // WebSocket connection handling
 wss.on('connection', (ws, req) => {
     const participantId = uuidv4();
     let currentRoomId = null;
     const connectionTime = new Date();
+    ws.isAlive = true;
+    ws.on('pong', () => { ws.isAlive = true; });
 
     console.log(`[${new Date().toISOString()}] New WebSocket connection: ${participantId} from ${req.socket.remoteAddress}`);
 
@@ -99,6 +162,7 @@ wss.on('connection', (ws, req) => {
                 case 'chat-message':
                 case 'reaction':
                 case 'hand-raised':
+                case 'media-state':
                     broadcastRoomActivity(participantId, data, currentRoomId);
                     break;
                     
@@ -144,11 +208,12 @@ wss.on('connection', (ws, req) => {
 
 function handleJoinRoom(ws, participantId, data) {
     try {
-        const { roomId, userId, userName } = data;
+        const { roomId, userId, userName, connectionKey } = data;
         
         if (typeof roomId !== 'string' || !roomId.trim() || roomId.length > 128 ||
             typeof userId !== 'string' || !userId.trim() || userId.length > 128 ||
-            (userName != null && (typeof userName !== 'string' || userName.length > 80))) {
+            (userName != null && (typeof userName !== 'string' || userName.length > 80)) ||
+            (connectionKey != null && (typeof connectionKey !== 'string' || connectionKey.length > 64))) {
             ws.send(JSON.stringify({
                 type: 'error',
                 message: 'Invalid join data'
@@ -157,6 +222,7 @@ function handleJoinRoom(ws, participantId, data) {
         }
 
         const participantName = userName?.trim() || `User ${userId.slice(0, 4)}`;
+        const media = parseMediaState(data.media);
         // Create room if it doesn't exist
         if (!rooms.has(roomId)) {
             rooms.set(roomId, new Map());
@@ -168,7 +234,8 @@ function handleJoinRoom(ws, participantId, data) {
         // Keep a live participant's identity bound to their socket.
         for (const [pid, participant] of room.entries()) {
             if (participant.userId === userId) {
-                if (participant.ws.readyState === WebSocket.OPEN) {
+                const active = participant.ws.readyState === WebSocket.OPEN;
+                if (active && (!connectionKey || participant.connectionKey !== connectionKey)) {
                     ws.send(JSON.stringify({
                         type: 'error',
                         message: 'This participant is already in the meeting'
@@ -176,6 +243,7 @@ function handleJoinRoom(ws, participantId, data) {
                     return false;
                 }
                 removeParticipant(room, pid);
+                if (active) participant.ws.close(4001, 'Connection replaced');
                 break;
             }
         }
@@ -185,7 +253,9 @@ function handleJoinRoom(ws, participantId, data) {
             ws, 
             userId, 
             userName: participantName,
+            connectionKey,
             raised: false,
+            media,
             lastActivity: {},
             joinedAt: new Date().toISOString()
         });
@@ -196,7 +266,8 @@ function handleJoinRoom(ws, participantId, data) {
             participantId: participantId,
             userId: userId,
             userName: participantName,
-            raised: false
+            raised: false,
+            media
         };
         
         for (const [pid, participant] of room.entries()) {
@@ -217,7 +288,8 @@ function handleJoinRoom(ws, participantId, data) {
                     participantId: pid, 
                     userId: participant.userId,
                     userName: participant.userName,
-                    raised: participant.raised
+                    raised: participant.raised,
+                    media: participant.media
                 });
             }
         }
@@ -226,10 +298,12 @@ function handleJoinRoom(ws, participantId, data) {
             ws.send(JSON.stringify({
                 type: 'existing-participants',
                 participants: existingParticipants,
+                iceServers: getIceServers(participantId),
                 yourInfo: {
                     userId: userId,
                     userName: participantName,
-                    raised: false
+                    raised: false,
+                    media
                 }
             }));
         }
@@ -302,7 +376,8 @@ function broadcastRoomActivity(participantId, data, roomId) {
 
     const { type } = data;
     const now = Date.now();
-    if (now - (sender.lastActivity[type] ?? 0) < activityCooldowns[type]) return;
+    const cooldown = activityCooldowns[type];
+    if (cooldown && now - (sender.lastActivity[type] ?? 0) < cooldown) return;
 
     const message = { type, userId: sender.userId, userName: sender.userName };
     switch (type) {
@@ -323,6 +398,14 @@ function broadcastRoomActivity(participantId, data, roomId) {
             sender.raised = data.raised;
             message.raised = sender.raised;
             break;
+        case 'media-state': {
+            const media = parseMediaState(data);
+            if (!media || (sender.media?.camera === media.camera &&
+                sender.media.mic === media.mic && sender.media.sharing === media.sharing)) return;
+            sender.media = media;
+            message.media = media;
+            break;
+        }
     }
 
     sender.lastActivity[type] = now;
@@ -340,27 +423,21 @@ function forwardToParticipant(participantId, data, roomId) {
         const sender = room?.get(participantId);
         if (!sender) return;
 
-        let targetParticipant = null;
-        
-        // Find target participant
-        for (const [_, participant] of room.entries()) {
-            if (participant.userId === data.to) {
-                targetParticipant = participant;
-                break;
-            }
-        }
-        
-        if (targetParticipant && targetParticipant.ws.readyState === WebSocket.OPEN) {
-            targetParticipant.ws.send(JSON.stringify({
+        for (const [targetId, participant] of room.entries()) {
+            if (participant.userId !== data.to) continue;
+            if (data.toParticipantId != null && data.toParticipantId !== targetId) return;
+            if (participant.ws.readyState !== WebSocket.OPEN) break;
+
+            participant.ws.send(JSON.stringify({
                 type: data.type,
                 from: sender.userId,
                 fromName: sender.userName,
+                fromParticipantId: participantId,
                 data: data.data
             }));
-        } else {
-            // Target not found or not open
-            console.log(`Target ${data.to} not found or not connected in room ${roomId}`);
+            return;
         }
+        console.log(`Target ${data.to} not found or not connected in room ${roomId}`);
         
     } catch (error) {
         console.error('Error in forwardToParticipant:', error);

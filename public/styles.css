@@ -400,10 +400,43 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
     animation: window-in 300ms ease-out both;
 }
 
-.meeting-header { min-height: 68px; padding-inline: clamp(12px, 2.2vw, 30px); }
-.room-heading { min-width: 0; padding-inline-start: 16px; border-inline-start: 1px solid var(--line-strong); }
-.room-heading h1 { margin: 0; font-size: 1rem; font-weight: 650; letter-spacing: -.02em; overflow-wrap: anywhere; }
-.meeting-status { display: inline-flex; align-items: center; gap: 6px; margin-top: 3px; color: var(--quiet); font-size: .78rem; white-space: nowrap; }
+.meeting-header {
+    min-height: 42px;
+    gap: 12px;
+    padding: 4px clamp(10px, 1.65vw, 24px);
+}
+
+.meeting-header .brand { flex: none; gap: 7px; font-size: .85rem; }
+.meeting-header .brand-icon { width: 23px; height: 23px; border-radius: 6px; }
+.meeting-actions { flex: none; gap: 4px; }
+.meeting-actions > button { min-height: 30px; padding-inline: 8px; border-radius: 7px; font-size: .78rem; }
+.meeting-actions .icon-btn { min-width: 30px; padding-inline: 5px; border-color: transparent; background: transparent; }
+.meeting-actions .icon-btn:hover { border-color: var(--line); background: var(--surface-hover); }
+.meeting-actions .icon { width: 15px; height: 15px; }
+
+.room-heading {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 11px;
+    padding-inline-start: 12px;
+    border-inline-start: 1px solid var(--line-strong);
+}
+
+.room-heading h1 {
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    color: var(--text);
+    font-size: .85rem;
+    font-weight: 650;
+    letter-spacing: -.015em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.meeting-status { display: inline-flex; min-width: 0; align-items: center; gap: 5px; color: var(--quiet); font-size: .75rem; white-space: nowrap; }
+#connection-label { overflow: hidden; text-overflow: ellipsis; }
 .meeting-status time { font-variant-numeric: tabular-nums; }
 .status-dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--green); }
 .status-dot.is-waiting { background: var(--danger); }
@@ -433,6 +466,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
 
 .stage-bar { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: 8px 15px; }
 .stage-count { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: .88rem; font-weight: 630; }
+.stage-bar .secondary { min-height: 32px; padding: 4px 9px; font-size: .78rem; }
 .stage-bar > :last-child { margin-inline-start: auto; }
 .stage-empty { margin: 0 auto; padding: 0 0 5px; color: var(--muted); font-size: .875rem; text-align: center; }
 .stage-empty p { margin: 0 0 2px; }
@@ -468,6 +502,8 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
 .video-tile:only-child { width: min(100%, 850px); max-height: 58vh; justify-self: center; }
 .video-tile.is-pinned { width: min(100%, 920px); max-height: 51vh; grid-column: 1 / -1; order: -1; justify-self: center; border-color: #b6a0ffae; }
 .video-grid.has-pin .video-tile:not(.is-pinned) { width: min(100%, 285px); justify-self: center; }
+.video-grid.has-share:not(.has-pin) .video-tile.is-sharing { width: min(100%, 1040px); max-height: 62vh; grid-column: 1 / -1; order: -1; justify-self: center; }
+.video-grid.has-share:not(.has-pin) .video-tile:not(.is-sharing) { width: min(100%, 260px); justify-self: center; }
 
 .video-tile video {
     position: absolute;
@@ -537,12 +573,26 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
 
 .tile-meta .icon { width: 14px; height: 14px; }
 .tile-meta .tile-hand { color: #f0ce87; }
+.tile-meta .tile-muted, .participant-muted { color: var(--danger); }
+.tile-meta .tile-sharing { color: #cfbaff; }
+.tile-meta .tile-connection { color: #f0ce87; }
 .tile-actions { position: absolute; z-index: 1; top: 8px; right: 8px; display: flex; gap: 5px; }
 .video-tile .icon-btn { min-width: 40px; min-height: 40px; border-color: #ffffff2e; background: #10101cd9; color: #fff; }
 .video-tile .icon-btn:hover, .video-tile .icon-btn[aria-pressed="true"] { border-color: #bcaaff75; background: #372b64; color: #eee6ff; }
-.video-tile:fullscreen { border: 0; border-radius: 0; background: #10101c; }
-.video-tile:fullscreen video { object-fit: contain; }
-.meeting-shell:fullscreen { overflow: auto; background: var(--background); }
+.video-tile:is(:fullscreen, :-webkit-full-screen) { border: 0; border-radius: 0; background: #10101c; }
+.video-tile:is(:fullscreen, :-webkit-full-screen) video { object-fit: contain; }
+.meeting-shell:is(:fullscreen, :-webkit-full-screen) {
+    height: 100%;
+    min-height: 0;
+    grid-template-rows: minmax(0, 1fr) auto;
+    overflow: hidden;
+    background: var(--background);
+}
+
+.meeting-shell:is(:fullscreen, :-webkit-full-screen) .meeting-header { display: none; }
+.meeting-shell:is(:fullscreen, :-webkit-full-screen) .meeting-body { overflow: auto; padding: 8px; }
+.meeting-shell:is(:fullscreen, :-webkit-full-screen) .stage { border: 0; border-radius: 10px; }
+.meeting-shell:is(:fullscreen, :-webkit-full-screen) .video-tile:only-child { max-height: 72vh; }
 
 .inspector {
     display: flex;
@@ -843,9 +893,13 @@ kbd { min-width: 21px; display: inline-block; padding: 2px 4px; border: 1px soli
     .segmented button .icon { width: 14px; height: 14px; }
     .window-footer { padding-inline: 12px; }
     .meeting-shell { height: 100dvh; min-height: 0; }
-    .meeting-header { flex-wrap: wrap; gap: 8px; padding-block: 8px; }
-    .meeting-header .brand { font-size: .82rem; }
-    .room-heading { padding-inline-start: 9px; }
+    .meeting-header { min-height: 44px; gap: 7px; padding-block: 3px; }
+    .meeting-header .brand { gap: 5px; font-size: .79rem; }
+    .room-heading { flex-direction: column; align-items: flex-start; gap: 2px; padding-inline-start: 7px; }
+    .room-heading h1 { max-width: 100%; font-size: .76rem; }
+    .meeting-status { max-width: 100%; gap: 3px; font-size: .69rem; }
+    .meeting-actions > button { min-height: 36px; }
+    .meeting-actions .icon-btn { min-width: 32px; }
     .meeting-body { flex-direction: column; overflow: auto; }
     .stage { min-height: 265px; flex: 1 0 auto; }
     .video-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 145px), 1fr)); }
@@ -863,6 +917,9 @@ kbd { min-width: 21px; display: inline-block; padding: 2px 4px; border: 1px soli
 }
 
 @media (max-width: 530px) {
+    .meeting-actions { gap: 2px; }
+    #invite-button { min-width: 32px; padding-inline: 5px; }
+    #invite-button > :last-child { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
     .meeting-footer { gap: 7px; }
     .dock { display: grid; width: min(100%, 295px); grid-template-columns: repeat(4, minmax(0, 1fr)); padding: 4px; }
     .dock-btn { width: 100%; min-width: 0; padding-inline: 3px; }
@@ -872,10 +929,15 @@ kbd { min-width: 21px; display: inline-block; padding: 2px 4px; border: 1px soli
     .window-bar { grid-template-columns: auto minmax(0, 1fr) auto; }
     .window-bar .brand { justify-self: center; }
     .window-footer { flex-wrap: wrap; }
-    .meeting-header .brand { gap: 5px; }
-    .meeting-header .brand-icon { width: 24px; height: 24px; }
-    .meeting-actions { gap: 3px; }
-    .meeting-actions .icon-btn { min-width: 35px; min-height: 35px; padding-inline: 5px; }
+    .meeting-header { gap: 6px; padding-inline: 8px; }
+    .meeting-header .brand-icon { width: 20px; height: 20px; }
+    .meeting-header .brand small { display: none; }
+    .room-heading h1 { font-size: 0; }
+    #room-code { font-size: .76rem; }
+}
+
+@media (max-width: 350px) {
+    .meeting-status #connection-label + span, .meeting-status time { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

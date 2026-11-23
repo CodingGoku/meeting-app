@@ -1,5 +1,5 @@
-import { initIcons, setIcon } from './icons.js';
-import { MeetingMedia } from './media.js';
+import { initIcons, setIcon } from './icons.js?v=3';
+import { MeetingMedia } from './media.js?v=3';
 
 const $ = id => document.getElementById(id);
 const lobby = $('lobby');
@@ -189,6 +189,14 @@ function updateRoster(session) {
       setIcon(hand, 'hand');
       row.append(hand);
     }
+    if (person.media?.mic === false) {
+      const mute = document.createElement('span');
+      mute.className = 'participant-muted';
+      mute.title = 'Microphone muted';
+      mute.setAttribute('aria-label', 'Microphone muted');
+      setIcon(mute, 'micOff');
+      row.append(mute);
+    }
     person.tile.querySelector('.tile-hand').hidden = !person.raised;
     list.append(row);
   }
@@ -207,7 +215,7 @@ function setPin(session, id) {
   }
 }
 
-function setPerson(session, id, name, raised = false) {
+function setPerson(session, id, name, raised = false, media) {
   let person = session.people.get(id);
   if (!person) {
     const tile = $('tile-template').content.firstElementChild.cloneNode(true);
@@ -217,7 +225,7 @@ function setPerson(session, id, name, raised = false) {
     tile.querySelector('.tile-pin').addEventListener('click', () => setPin(session, id));
     const fullscreen = tile.querySelector('.tile-fullscreen');
     fullscreen.addEventListener('click', () => toggleFullscreen(tile));
-    person = { id, tile, video };
+    person = { id, tile, video, local: id === session.id };
     session.people.set(id, person);
     $('video-grid').append(tile);
   }
@@ -231,6 +239,7 @@ function setPerson(session, id, name, raised = false) {
   const pinLabel = (session.pinned === id ? 'Unpin ' : 'Pin ') + name;
   person.tile.querySelector('.tile-pin').setAttribute('aria-label', pinLabel);
   person.tile.querySelector('.tile-fullscreen').setAttribute('aria-label', 'Fullscreen ' + name);
+  if (media) setPersonMedia(session, person, media);
   return person;
 }
 
@@ -239,6 +248,7 @@ function removePerson(session, id) {
   const person = session.people.get(id);
   person?.tile.remove();
   session.people.delete(id);
+  syncMeetingActions(session);
 }
 
 function showStream(person, stream, hasVideo) {
@@ -248,6 +258,66 @@ function showStream(person, stream, hasVideo) {
   person.tile.classList.toggle('has-video', hasVideo);
 }
 
+function setPersonMedia(session, person, state) {
+  person.media = state;
+  person.tile.classList.toggle('is-sharing', state.sharing);
+  person.tile.querySelector('.tile-sharing').hidden = !state.sharing;
+  person.tile.querySelector('.tile-muted').hidden = state.mic !== false;
+  if (!person.local) renderRemote(session, person, person.video.srcObject);
+  syncMeetingActions(session);
+}
+
+function renderRemote(session, person, stream) {
+  if (!person) return;
+  const hasVideo = (person.media == null || person.media.camera || person.media.sharing) &&
+    Boolean(stream?.getVideoTracks().some(track => !track.muted && track.readyState === 'live'));
+  showStream(person, stream, hasVideo);
+  if (stream?.getTracks().some(track => !track.muted && track.readyState === 'live') &&
+      person.video.paused && !person.playAttempt) playRemote(session, person);
+}
+
+function playRemote(session, person) {
+  const video = person.video;
+  person.playAttempt = video.play().then(() => {
+    if (!video.muted) person.awaitingAudio = false;
+  }).catch(async error => {
+    if (error.name !== 'NotAllowedError' || video.muted) return;
+    // Some browsers require a tap for incoming audio, including listen-only joins.
+    person.awaitingAudio = true;
+    video.muted = true;
+    syncMeetingActions(session);
+    await video.play().catch(() => {});
+  }).finally(() => {
+    person.playAttempt = null;
+    syncMeetingActions(session);
+  });
+}
+
+function syncMeetingActions(session) {
+  if (active !== session) return;
+  const people = [...session.people.values()];
+  $('enable-audio').hidden = !people.some(person => person.awaitingAudio);
+  $('retry-media').hidden = !session.ready || !people.some(person => person.connection === 'failed');
+  $('video-grid').classList.toggle('has-share', people.some(person => person.media?.sharing));
+  if (!session.ready) return;
+  const remote = people.filter(person => !person.local);
+  let label = 'Connected';
+  if (remote.some(person => person.connection === 'failed')) label = 'Media needs attention';
+  else if (remote.some(person => person.connection === 'reconnecting')) label = 'Reconnecting media…';
+  else if (remote.some(person => person.connection !== 'connected')) label = 'Connecting media…';
+  setConnection(label);
+}
+
+function updatePeerStatus(session, id, status) {
+  const person = session.people.get(id);
+  if (!person || active !== session) return;
+  person.connection = status;
+  const badge = person.tile.querySelector('.tile-connection');
+  badge.hidden = status === 'connected';
+  badge.textContent = { connecting: 'Connecting…', reconnecting: 'Reconnecting…', failed: 'Media unavailable' }[status] || '';
+  syncMeetingActions(session);
+}
+
 function updateToggle(button, enabled, label) {
   button.setAttribute('aria-pressed', String(enabled));
   button.title = label;
@@ -255,10 +325,15 @@ function updateToggle(button, enabled, label) {
 
 function renderMedia(session, stream, state) {
   if (active !== session) return;
+  const changed = ['camera', 'mic', 'sharing'].some(key => state[key] !== session.mediaState[key]);
   session.mediaState = state;
-  if (session.ready) rememberActiveMeeting(session);
+  if (session.ready && changed) {
+    rememberActiveMeeting(session);
+    if (session.hasMediaState) send(session, 'media-state', state);
+  }
   const person = session.people.get(session.id);
-  person.tile.classList.toggle('is-sharing', state.sharing);
+  setPersonMedia(session, person, state);
+  if (changed) updateRoster(session);
   person.tile.classList.toggle('is-mirrored', state.camera && !state.sharing);
   showStream(person, stream, state.camera || state.sharing);
   const mic = $('mic-button');
@@ -273,7 +348,7 @@ function renderMedia(session, stream, state) {
 }
 
 function setConnection(value) {
-  $('connection-label').textContent = value;
+  if ($('connection-label').textContent !== value) $('connection-label').textContent = value;
   $('connection-indicator').classList.toggle('is-waiting', value !== 'Connected');
 }
 
@@ -288,7 +363,8 @@ function tick(session) {
 
 function send(session, type, payload = {}) {
   if (active !== session || !session.ready || session.socket?.readyState !== WebSocket.OPEN) return false;
-  session.socket.send(JSON.stringify({ type, ...payload }));
+  // Older signaling servers forward these sender fields directly.
+  session.socket.send(JSON.stringify({ type, ...payload, from: session.id, fromName: session.name }));
   return true;
 }
 
@@ -330,7 +406,7 @@ function showReaction(session, data) {
   setTimeout(() => reaction.remove(), 2300);
 }
 
-async function handleMessage(session, data) {
+function handleMessage(session, data) {
   switch (data.type) {
     case 'existing-participants':
       session.ready = true;
@@ -341,24 +417,27 @@ async function handleMessage(session, data) {
         session.timer = setInterval(() => tick(session), 1000);
         rememberRoom(session);
       }
-      setConnection('Connected');
+      session.hasMediaState = Boolean(data.yourInfo?.media);
+      session.media.setIceServers(data.iceServers);
       rememberActiveMeeting(session);
       for (const person of data.participants) {
-        setPerson(session, person.userId, person.userName, person.raised);
-        await session.media.addPeer(person.userId, false, person.participantId);
+        setPerson(session, person.userId, person.userName, person.raised, person.media);
+        void session.media.addPeer(person.userId, false, person.participantId);
       }
+      if (session.hasMediaState) send(session, 'media-state', session.mediaState);
       if (session.people.get(session.id).raised) send(session, 'hand-raised', { raised: true });
       updateRoster(session);
+      syncMeetingActions(session);
       break;
     case 'user-joined':
-      setPerson(session, data.userId, data.userName, data.raised);
+      setPerson(session, data.userId, data.userName, data.raised, data.media);
       updateRoster(session);
-      await session.media.addPeer(data.userId, true, data.participantId);
+      void session.media.addPeer(data.userId, true, data.participantId);
       break;
     case 'offer':
     case 'answer':
     case 'ice-candidate':
-      await session.media.handleSignal(data);
+      void session.media.handleSignal(data);
       break;
     case 'user-left':
       session.media.removePeer(data.userId);
@@ -371,6 +450,13 @@ async function handleMessage(session, data) {
     case 'reaction':
       showReaction(session, data);
       break;
+    case 'media-state': {
+      const person = session.people.get(data.userId);
+      if (!person || person.local || !data.media) break;
+      setPersonMedia(session, person, data.media);
+      updateRoster(session);
+      break;
+    }
     case 'hand-raised': {
       const person = session.people.get(data.userId);
       if (!person) break;
@@ -389,19 +475,25 @@ async function handleMessage(session, data) {
 function connect(session) {
   const url = new URL(location.href);
   url.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  url.pathname = '/';
   url.search = '';
   url.hash = '';
   const socket = new WebSocket(url);
   session.socket = socket;
   session.connectTimeout = setTimeout(() => socket.close(), 9000);
   socket.addEventListener('open', () => {
-    socket.send(JSON.stringify({ type: 'join-room', roomId: session.room, userId: session.id, userName: session.name }));
+    socket.send(JSON.stringify({
+      type: 'join-room', roomId: session.room, userId: session.id, userName: session.name,
+      connectionKey: session.connectionKey, media: session.mediaState
+    }));
   });
   socket.addEventListener('message', event => {
-    session.incoming = session.incoming.then(async () => {
-      if (active !== session || socket !== session.socket || socket.readyState !== WebSocket.OPEN) return;
-      await handleMessage(session, JSON.parse(event.data));
-    }).catch(error => console.warn('Meeting message could not be processed', error));
+    if (active !== session || socket !== session.socket || socket.readyState !== WebSocket.OPEN) return;
+    try {
+      handleMessage(session, JSON.parse(event.data));
+    } catch (error) {
+      console.warn('Meeting message could not be processed', error);
+    }
   });
   socket.addEventListener('close', () => {
     clearTimeout(session.connectTimeout);
@@ -435,8 +527,8 @@ function setBusy(value) {
 async function enterMeeting(room, name) {
   if (active) return;
   const session = {
-    id: makeUserId(), room, name, people: new Map(), pinned: null,
-    incoming: Promise.resolve(), mediaState: {}, failures: 0
+    id: makeUserId(), connectionKey: makeUserId(), room, name, people: new Map(), pinned: null,
+    mediaState: {}, failures: 0
   };
   active = session;
   const devices = { mic: $('start-mic').checked, camera: $('start-camera').checked };
@@ -448,11 +540,9 @@ async function enterMeeting(room, name) {
     session.media = new MeetingMedia({
       send: (type, payload) => send(session, type, payload),
       onLocal: (stream, state) => renderMedia(session, stream, state),
-      onRemote: (id, stream) => {
-        const hasVideo = stream.getVideoTracks().some(track => !track.muted && track.readyState === 'live');
-        showStream(session.people.get(id), stream, hasVideo);
-      },
+      onRemote: (id, stream) => renderRemote(session, session.people.get(id), stream),
       onRemoteRemoved: id => showStream(session.people.get(id), null, false),
+      onStatus: (id, status) => updatePeerStatus(session, id, status),
       notify
     });
     await session.media.prepare(devices);
@@ -541,12 +631,24 @@ async function copy(text, label) {
 
 async function toggleFullscreen(target = meeting) {
   try {
-    if (document.fullscreenElement === target) await document.exitFullscreen();
+    if (document.fullscreenElement) await document.exitFullscreen();
     else await target.requestFullscreen();
   } catch {
     notify('Fullscreen is unavailable in this browser.');
   }
 }
+
+document.addEventListener('fullscreenchange', () => {
+  for (const button of meeting.querySelectorAll('#fullscreen-button, .tile-fullscreen')) {
+    const tile = button.closest('.video-tile');
+    const expanded = document.fullscreenElement === (tile || meeting);
+    const name = tile?.querySelector('.tile-name').textContent;
+    const label = expanded ? 'Exit full screen' : name ? 'Full screen for ' + name : 'Enter full screen';
+    button.setAttribute('aria-label', label);
+    button.title = label;
+    setIcon(button, expanded ? 'fullscreenExit' : 'fullscreen');
+  }
+});
 
 function setUnread(count) {
   unread = count;
@@ -649,6 +751,18 @@ $('empty-invite').addEventListener('click', openInvite);
 $('copy-invite').addEventListener('click', () => copy($('invite-link').value, 'Invite link'));
 $('copy-code').addEventListener('click', () => copy(active.room, 'Room code'));
 $('fullscreen-button').addEventListener('click', () => toggleFullscreen());
+$('enable-audio').addEventListener('click', () => {
+  const session = active;
+  if (!session) return;
+  for (const person of session.people.values()) {
+    if (!person.awaitingAudio || person.local) continue;
+    person.video.muted = false;
+    playRemote(session, person);
+  }
+});
+$('retry-media').addEventListener('click', () => {
+  active?.socket?.close(4000, 'Retry media');
+});
 $('mic-button').addEventListener('click', () => active?.media.toggleMic());
 $('camera-button').addEventListener('click', () => active?.media.toggleCamera());
 $('share-button').addEventListener('click', toggleShare);

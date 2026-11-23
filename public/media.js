@@ -1,25 +1,25 @@
-const iceServers = [
+const stunServers = [
     { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
-    {
-        urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443'],
-        username: 'openrelayproject',
-        credential: 'openrelayproject'
-    }
+    { urls: 'stun:stun1.l.google.com:19302' }
 ];
 
 const isLive = track => track?.readyState === 'live';
 const stopStream = stream => stream?.getTracks().forEach(track => track.stop());
+const ICE_TIMEOUT = 11000;
+const MAX_RESTARTS = 2;
+const mediaKinds = ['audio', 'video'];
 
 export class MeetingMedia {
-    constructor({ send, onLocal, onRemote, onRemoteRemoved, notify }) {
+    constructor({ send, onLocal, onRemote, onRemoteRemoved, onStatus = () => {}, notify }) {
         this.send = send;
         this.onLocal = onLocal;
         this.onRemote = onRemote;
         this.onRemoteRemoved = onRemoteRemoved;
         this.notify = notify;
+        this.onStatus = onStatus;
         this.preview = new MediaStream();
+        this.outbound = new MediaStream();
+        this.iceServers = stunServers;
         this.peers = new Map();
         this.devices = { mic: null, camera: null };
         this.pendingDevices = new Set();
@@ -129,7 +129,10 @@ export class MeetingMedia {
         this.pendingShare = true;
         try {
             if (includeAudio) this.startAudioMix();
-            const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: includeAudio });
+            const stream = await navigator.mediaDevices.getDisplayMedia({
+                video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 24, max: 30 } },
+                audio: includeAudio
+            });
             const [video] = stream.getVideoTracks();
             if (this.destroyed || !isLive(video)) {
                 stopStream(stream);
@@ -222,34 +225,66 @@ export class MeetingMedia {
         return mic || sharedAudio || null;
     }
 
+    setIceServers(servers) {
+        this.iceServers = Array.isArray(servers) ? [...stunServers, ...servers] : stunServers;
+    }
+
+    localTracks() {
+        const { camera, sharing } = this.state;
+        return {
+            audio: this.outgoingAudio(),
+            video: sharing ? this.displayStream.getVideoTracks()[0] : camera ? this.devices.camera : null
+        };
+    }
+
+    syncStream(stream, tracks) {
+        for (const track of stream.getTracks()) {
+            if (!tracks.includes(track)) stream.removeTrack(track);
+        }
+        for (const track of tracks) {
+            if (!stream.getTracks().includes(track)) stream.addTrack(track);
+        }
+    }
+
     async refresh() {
         if (this.destroyed) return;
         const state = this.state;
-        const camera = state.camera ? this.devices.camera : null;
-        if (camera) camera.enabled = !state.sharing;
-        const video = state.sharing ? this.displayStream.getVideoTracks()[0] : camera;
-        for (const track of this.preview.getVideoTracks()) {
-            if (track !== video) this.preview.removeTrack(track);
-        }
-        if (video && !this.preview.getVideoTracks().includes(video)) this.preview.addTrack(video);
+        if (state.camera) this.devices.camera.enabled = !state.sharing;
+        const { audio, video } = this.localTracks();
+        this.syncStream(this.preview, [video].filter(Boolean));
+        this.syncStream(this.outbound, [audio, video].filter(Boolean));
         this.onLocal(this.preview, state);
-        await Promise.all(Array.from(this.peers.entries(), ([userId, peer]) =>
+        await Promise.all(Array.from(this.peers, ([userId, peer]) =>
             this.queue(userId, peer, () => this.syncSenders(peer))
         ));
     }
 
+    async replaceSenderTrack(peer, sender, track) {
+        try {
+            await sender.replaceTrack(track);
+        } catch (error) {
+            if (this.destroyed || peer.pc.signalingState === 'closed') return;
+            if (!this.state.sharing || track?.kind !== 'video' ||
+                error.name !== 'InvalidModificationError' || !track.applyConstraints) throw error;
+            await track.applyConstraints({ width: { max: 1280 }, height: { max: 720 }, frameRate: { max: 24 } });
+            await sender.replaceTrack(track);
+        }
+    }
+
     async syncSenders(peer) {
-        const state = this.state;
-        const video = state.sharing ? this.displayStream.getVideoTracks()[0] : this.devices.camera;
-        const audio = this.outgoingAudio();
-        const updates = [];
-        if (peer.videoSender && peer.videoSender.track !== video) {
-            updates.push(peer.videoSender.replaceTrack(isLive(video) ? video : null));
-        }
-        if (peer.audioSender && peer.audioSender.track !== audio) {
-            updates.push(peer.audioSender.replaceTrack(audio));
-        }
-        await Promise.all(updates);
+        const tracks = this.localTracks();
+        await Promise.all(mediaKinds.map(async kind => {
+            const sender = peer.senders[kind];
+            const track = tracks[kind];
+            if (!sender || sender.track === track) return;
+            try {
+                await this.replaceSenderTrack(peer, sender, track);
+            } catch (error) {
+                if (peer.pc.signalingState === 'closed') return;
+                console.warn('Could not update outgoing ' + kind, error);
+                this.notify(kind === 'video' ? 'Could not update outgoing video' : 'Could not update outgoing audio');
+            }
+        }));
     }
 
     addPeer(userId, initiate = false, participantId = null) {
@@ -261,25 +296,25 @@ export class MeetingMedia {
         }
         if (!peer) {
             try {
-                const pc = new RTCPeerConnection({ iceServers });
+                const pc = new RTCPeerConnection({ iceServers: this.iceServers });
                 peer = {
-                    pc,
-                    participantId,
-                    stream: new MediaStream(),
-                    candidates: [],
-                    queue: Promise.resolve(),
-                    audioSender: null,
-                    videoSender: null
+                    pc, participantId, initiate,
+                    stream: new MediaStream(), senders: {},
+                    candidates: [], outgoingCandidates: [],
+                    queue: Promise.resolve(), restarts: 0, status: 'connecting'
                 };
                 this.peers.set(userId, peer);
+                this.onStatus(userId, 'connecting');
                 pc.onicecandidate = ({ candidate }) => {
-                    if (candidate) this.send('ice-candidate', { to: userId, data: { candidate } });
+                    if (!candidate || this.peers.get(userId) !== peer) return;
+                    if (peer.descriptionSent) this.sendCandidate(userId, peer, candidate);
+                    else peer.outgoingCandidates.push(candidate);
                 };
                 pc.ontrack = ({ track }) => {
                     const update = () => {
                         if (this.peers.get(userId) === peer) this.onRemote(userId, peer.stream);
                     };
-                    peer.stream.addTrack(track);
+                    if (!peer.stream.getTracks().includes(track)) peer.stream.addTrack(track);
                     track.addEventListener('mute', update);
                     track.addEventListener('unmute', update);
                     track.addEventListener('ended', () => {
@@ -288,32 +323,86 @@ export class MeetingMedia {
                     }, { once: true });
                     update();
                 };
-                pc.onconnectionstatechange = () => {
-                    if (pc.connectionState === 'failed' && this.peers.get(userId) === peer) {
-                        this.onRemoteRemoved(userId);
-                        this.notify('Could not connect meeting media to a participant');
-                    }
-                };
-            } catch {
-                if (!this.unavailableReported) {
-                    this.unavailableReported = true;
-                    this.notify('Calling is unavailable in this browser');
-                }
+                pc.onconnectionstatechange = () => this.watchConnection(userId, peer);
+                pc.oniceconnectionstatechange = () => this.watchConnection(userId, peer);
+                this.scheduleRecovery(userId, peer, ICE_TIMEOUT);
+            } catch (error) {
+                console.warn('Could not create a meeting peer connection', error);
+                this.onStatus(userId, 'failed');
                 return Promise.resolve();
             }
         }
         if (participantId) peer.participantId = participantId;
         if (!initiate) return peer.queue;
         return this.queue(userId, peer, async () => {
-            const { pc } = peer;
-            if (pc.localDescription || pc.remoteDescription) return;
-            const options = { direction: 'sendrecv', streams: [this.preview] };
-            peer.audioSender = pc.addTransceiver('audio', options).sender;
-            peer.videoSender = pc.addTransceiver('video', options).sender;
-            await this.syncSenders(peer);
-            await pc.setLocalDescription(await pc.createOffer());
-            this.sendDescription(userId, peer);
+            if (peer.pc.localDescription || peer.pc.remoteDescription) return;
+            await this.offer(userId, peer);
         });
+    }
+
+    async offer(userId, peer, restart = false) {
+        const { pc } = peer;
+        if (pc.signalingState === 'have-local-offer') {
+            await pc.setLocalDescription({ type: 'rollback' });
+        }
+        if (pc.signalingState !== 'stable') return;
+
+        const tracks = this.localTracks();
+        this.syncStream(this.outbound, Object.values(tracks).filter(Boolean));
+        for (const kind of mediaKinds) {
+            if (peer.senders[kind]) continue;
+            // Attach available capture tracks as part of the first offer.
+            peer.senders[kind] = tracks[kind]
+                ? pc.addTrack(tracks[kind], this.outbound)
+                : pc.addTransceiver(kind, { direction: 'sendrecv', streams: [this.outbound] }).sender;
+        }
+        await this.describe(userId, peer, await pc.createOffer({ iceRestart: restart }));
+    }
+
+    watchConnection(userId, peer) {
+        if (this.peers.get(userId) !== peer) return;
+        const { connectionState, iceConnectionState } = peer.pc;
+        if (connectionState === 'connected' ||
+            (!connectionState && ['connected', 'completed'].includes(iceConnectionState))) {
+            clearTimeout(peer.recovery);
+            peer.recovery = null;
+            peer.restarts = 0;
+            this.setStatus(userId, peer, 'connected');
+        } else if (connectionState === 'failed' || iceConnectionState === 'failed') {
+            this.setStatus(userId, peer, 'reconnecting');
+            this.scheduleRecovery(userId, peer, 300, true);
+        } else if (connectionState === 'disconnected' || iceConnectionState === 'disconnected') {
+            this.setStatus(userId, peer, 'reconnecting');
+            this.scheduleRecovery(userId, peer, 3500, true);
+        } else if (!peer.recovery) {
+            this.scheduleRecovery(userId, peer, ICE_TIMEOUT);
+        }
+    }
+
+    setStatus(userId, peer, value) {
+        if (peer.status === value) return;
+        peer.status = value;
+        this.onStatus(userId, value);
+    }
+
+    scheduleRecovery(userId, peer, delay, replace = false) {
+        if (peer.recovery && !replace) return;
+        clearTimeout(peer.recovery);
+        peer.recovery = setTimeout(() => {
+            peer.recovery = null;
+            void this.queue(userId, peer, async () => {
+                if (peer.status === 'connected') return;
+                // The original offerer owns restarts, so both ends never offer at once.
+                if (!peer.initiate || peer.restarts >= MAX_RESTARTS) {
+                    this.setStatus(userId, peer, 'failed');
+                    return;
+                }
+                peer.restarts++;
+                this.setStatus(userId, peer, 'reconnecting');
+                this.scheduleRecovery(userId, peer, ICE_TIMEOUT);
+                await this.offer(userId, peer, true);
+            });
+        }, delay);
     }
 
     queue(userId, peer, operation) {
@@ -325,24 +414,68 @@ export class MeetingMedia {
         return peer.queue;
     }
 
-    sendDescription(userId, peer) {
-        if (this.peers.get(userId) !== peer) return;
-        const { localDescription: sdp } = peer.pc;
-        this.send(sdp.type, { to: userId, data: { sdp } });
+    sendCandidate(userId, peer, candidate) {
+        this.send('ice-candidate', { to: userId, toParticipantId: peer.participantId, data: { candidate } });
     }
 
-    async handleSignal({ type, from, data }) {
+    async describe(userId, peer, description) {
+        peer.descriptionSent = false;
+        await peer.pc.setLocalDescription(description);
+        if (this.peers.get(userId) !== peer) return;
+        const { localDescription: sdp } = peer.pc;
+        peer.descriptionSent = this.send(sdp.type, { to: userId, toParticipantId: peer.participantId, data: { sdp } }) !== false;
+        if (peer.descriptionSent) {
+            for (const candidate of peer.outgoingCandidates.splice(0)) this.sendCandidate(userId, peer, candidate);
+        }
+    }
+
+    candidateMatches(pc, candidate) {
+        const sdp = pc.remoteDescription?.sdp;
+        return Boolean(sdp && (!candidate.usernameFragment ||
+            sdp.split(/\r?\n/).includes('a=ice-ufrag:' + candidate.usernameFragment)));
+    }
+
+    async applyCandidate(pc, candidate) {
+        try {
+            await pc.addIceCandidate(candidate);
+        } catch (error) {
+            if (pc.signalingState !== 'closed') console.warn('Could not apply a meeting ICE candidate', error);
+        }
+    }
+
+    configureAnswer(peer) {
+        const { pc } = peer;
+        const tracks = this.localTracks();
+        this.syncStream(this.outbound, Object.values(tracks).filter(Boolean));
+        for (const transceiver of pc.getTransceivers()) {
+            if (transceiver.mid === null) continue;
+            const { kind } = transceiver.receiver.track;
+            peer.senders[kind] = transceiver.sender;
+            if (!transceiver.sender.track && tracks[kind] && !pc.currentRemoteDescription) {
+                // addTrack reuses the offered, unbound transceiver on its first answer.
+                try {
+                    const attached = pc.addTrack(tracks[kind], this.outbound);
+                    if (attached !== transceiver.sender) pc.removeTrack(attached);
+                } catch (error) {
+                    console.warn('Could not attach initial outgoing ' + kind, error);
+                }
+            }
+            transceiver.direction = 'sendrecv';
+        }
+    }
+
+    async handleSignal({ type, from, fromParticipantId, data }) {
         if (this.destroyed || !from || !data) return;
-        if (!this.peers.has(from)) await this.addPeer(from);
+        if (!this.peers.has(from)) await this.addPeer(from, false, fromParticipantId);
         const peer = this.peers.get(from);
-        if (!peer) return;
+        if (!peer || (fromParticipantId && peer.participantId && fromParticipantId !== peer.participantId)) return;
 
         return this.queue(from, peer, async () => {
             const { pc } = peer;
             if (type === 'ice-candidate' && data.candidate) {
-                if (pc.remoteDescription) {
-                    await pc.addIceCandidate(data.candidate);
-                } else if (peer.candidates.length < 256) {
+                if (this.candidateMatches(pc, data.candidate)) {
+                    await this.applyCandidate(pc, data.candidate);
+                } else if (peer.candidates.length < 192) {
                     peer.candidates.push(data.candidate);
                 }
                 return;
@@ -351,23 +484,14 @@ export class MeetingMedia {
             if (type === 'answer' && pc.signalingState !== 'have-local-offer') return;
             await pc.setRemoteDescription(data.sdp);
             for (const candidate of peer.candidates.splice(0)) {
-                try {
-                    await pc.addIceCandidate(candidate);
-                } catch (error) {
-                    console.warn('Could not apply a meeting ICE candidate', error);
-                }
+                if (this.candidateMatches(pc, candidate)) await this.applyCandidate(pc, candidate);
             }
             if (type === 'offer') {
-                for (const transceiver of pc.getTransceivers()) {
-                    if (transceiver.mid === null) continue;
-                    transceiver.direction = 'sendrecv';
-                    if (transceiver.receiver.track.kind === 'audio') peer.audioSender = transceiver.sender;
-                    if (transceiver.receiver.track.kind === 'video') peer.videoSender = transceiver.sender;
-                    transceiver.sender.setStreams?.(this.preview);
-                }
+                if (peer.status !== 'connected') this.setStatus(from, peer, 'connecting');
+                this.scheduleRecovery(from, peer, ICE_TIMEOUT, true);
+                this.configureAnswer(peer);
+                await this.describe(from, peer, await pc.createAnswer());
                 await this.syncSenders(peer);
-                await pc.setLocalDescription(await pc.createAnswer());
-                this.sendDescription(from, peer);
             }
         });
     }
@@ -376,9 +500,11 @@ export class MeetingMedia {
         const peer = this.peers.get(userId);
         if (!peer) return;
         this.peers.delete(userId);
+        clearTimeout(peer.recovery);
         peer.pc.ontrack = null;
         peer.pc.onicecandidate = null;
         peer.pc.onconnectionstatechange = null;
+        peer.pc.oniceconnectionstatechange = null;
         peer.pc.close();
         this.onRemoteRemoved(userId);
     }
@@ -391,6 +517,7 @@ export class MeetingMedia {
         stopStream(this.displayStream);
         this.displayStream = null;
         this.closeAudioMix();
-        for (const track of this.preview.getTracks()) this.preview.removeTrack(track);
+        this.syncStream(this.preview, []);
+        this.syncStream(this.outbound, []);
     }
 }
