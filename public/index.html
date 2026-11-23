@@ -3,21 +3,23 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
   <meta name="theme-color" content="#10111b">
   <meta name="description" content="Start or join a video meeting with MeetStream Pro.">
   <title>MeetStream Pro</title>
   <link rel="icon" href="assets/meetstream-icon.webp" type="image/webp">
-  <link rel="stylesheet" href="styles.css?v=4">
-  <script type="module" src="app.js?v=4"></script>
+  <link rel="stylesheet" href="styles.css?v=5">
+  <script defer src="app.js?v=5"></script>
+  <script type="module" src="appearance.js?v=5"></script>
 </head>
 <body>
-  <main id="lobby" class="lobby-shell">
+  <main id="joinScreen" class="lobby-shell">
     <header class="window-bar">
       <div class="traffic-lights" aria-hidden="true"><i></i><i></i><i></i></div>
       <div class="brand"><img class="brand-icon" src="assets/meetstream-icon.webp" alt=""><span>MeetStream <small>Pro</small></span></div>
       <div class="window-actions">
-        <button class="icon-btn" type="button" data-theme-toggle aria-label="Switch to light theme" title="Switch theme" data-icon="sun"></button>
-        <button class="icon-btn" type="button" data-shortcuts aria-label="Keyboard shortcuts" title="Keyboard shortcuts" data-icon="keyboard"></button>
+        <button type="button" class="icon-btn" data-theme-toggle aria-label="Switch to light theme" title="Switch to light theme" data-icon="sun"></button>
+        <button type="button" class="icon-btn" data-shortcuts aria-label="Keyboard shortcuts" title="Keyboard shortcuts" data-icon="keyboard"></button>
       </div>
     </header>
 
@@ -26,161 +28,74 @@
         <img class="hero-art" src="assets/meeting-art.webp" alt="">
         <div class="hero-copy">
           <h1 id="brand-heading">Make time<br>to connect.</h1>
-          <p>Video meetings with screen sharing, live chat, and room for everyone.</p>
+          <p>Video meetings with screen sharing.</p>
         </div>
       </section>
 
       <section class="lobby-content" aria-labelledby="lobby-heading">
         <div class="lobby-intro">
-          <h2 id="lobby-heading" tabindex="-1">Join a meeting</h2>
-          <p id="lobby-description">Enter a room code or paste an invite link.</p>
+          <h2 id="lobby-heading">Join a meeting</h2>
+          <p>Enter a room code or start a new meeting.</p>
         </div>
-        <div class="segmented" aria-label="Meeting action">
-          <button type="button" id="join-mode" aria-pressed="true"><span data-icon="logIn"></span> Join meeting</button>
-          <button type="button" id="create-mode" aria-pressed="false"><span data-icon="plus"></span> New meeting</button>
-        </div>
-        <form id="lobby-form" class="form-stack">
-          <label for="display-name">Display name</label>
-          <input id="display-name" name="name" autocomplete="nickname" maxlength="40" placeholder="e.g. Alex Morgan" required>
-          <div id="room-field" class="field">
-            <label for="room-input">Room code or invite link</label>
-            <input id="room-input" name="room" autocomplete="off" autocapitalize="characters" maxlength="500" placeholder="e.g. 8QFP2K7A" required>
+        <div class="form-stack">
+          <label for="usernameInput">Display name</label>
+          <input id="usernameInput" autocomplete="nickname" placeholder="e.g. Alex Morgan">
+          <div class="field">
+            <label for="roomCode">Room code</label>
+            <input id="roomCode" autocomplete="off" autocapitalize="characters" placeholder="e.g. 8QFP2K7A">
           </div>
-          <fieldset class="lobby-options">
-            <legend>Join with</legend>
-            <label><input id="start-mic" type="checkbox" checked><span data-icon="mic"></span> Microphone</label>
-            <label><input id="start-camera" type="checkbox" checked><span data-icon="video"></span> Camera</label>
-          </fieldset>
-          <button id="enter-button" class="primary" type="submit"><span data-icon="logIn"></span><span id="enter-label">Join meeting</span></button>
-        </form>
-        <section id="recent" class="recent" aria-labelledby="recent-heading" hidden>
-          <div class="recent-heading"><h3 id="recent-heading">Recent rooms</h3><button id="clear-recent" class="text-button" type="button">Clear</button></div>
-          <ul id="recent-list"></ul>
-        </section>
+          <div class="lobby-buttons">
+            <button class="primary" id="joinBtn" type="button"><span data-icon="logIn"></span> Join meeting</button>
+            <button class="secondary" id="createBtn" type="button"><span data-icon="plus"></span> New meeting</button>
+          </div>
+        </div>
       </section>
     </div>
 
-    <footer class="window-footer"><span><span data-icon="check"></span> No account required</span><button type="button" class="text-button" data-shortcuts>Keyboard shortcuts</button></footer>
+    <footer class="window-footer">
+      <span><span data-icon="check"></span> No account required</span>
+      <button type="button" class="text-button" data-shortcuts>Keyboard shortcuts</button>
+    </footer>
   </main>
 
-  <main id="meeting" class="meeting-shell" hidden>
+  <main id="meetingUI" class="meeting-shell">
     <header class="meeting-header">
       <div class="brand"><img class="brand-icon" src="assets/meetstream-icon.webp" alt=""><span>MeetStream <small>Pro</small></span></div>
-      <div class="room-heading"><h1>Meeting <span id="room-code"></span></h1><span class="meeting-status"><span id="connection-indicator" class="status-dot"></span><span id="connection-label" role="status">Connected</span><span aria-hidden="true">·</span><time id="meeting-timer" aria-label="Time in meeting">00:00</time></span></div>
+      <div class="room-heading"><h1>Meeting <span id="displayRoomCode"></span></h1></div>
       <div class="meeting-actions">
-        <button id="invite-button" type="button" class="secondary"><span data-icon="link"></span><span>Invite</span></button>
-        <button type="button" class="icon-btn" data-theme-toggle aria-label="Switch to light theme" title="Switch theme" data-icon="sun"></button>
+        <button id="copyCodeBtn" type="button" class="secondary" aria-label="Copy room code" title="Copy room code"><span data-icon="copy"></span><span>Copy code</span></button>
+        <button type="button" class="icon-btn" data-theme-toggle aria-label="Switch to light theme" title="Switch to light theme" data-icon="sun"></button>
         <button type="button" class="icon-btn" data-shortcuts aria-label="Keyboard shortcuts" title="Keyboard shortcuts" data-icon="keyboard"></button>
       </div>
     </header>
 
-    <div id="meeting-body" class="meeting-body">
+    <div class="meeting-body">
       <section class="stage" aria-label="Video stage">
         <div class="stage-bar">
-          <span id="participant-count" class="stage-count"><span data-icon="people"></span><span id="count-label">1 participant</span></span>
-          <button id="enable-audio" type="button" class="secondary" hidden><span data-icon="volume"></span> Enable audio</button>
-          <button id="retry-media" type="button" class="secondary" hidden>Retry media</button>
-          <button id="fullscreen-button" type="button" class="icon-btn" aria-label="Enter full screen" title="Enter full screen (F)" data-icon="fullscreen"></button>
+          <span id="participantCount" class="stage-count">1 participant</span>
+          <button id="fullscreenBtn" type="button" class="icon-btn stage-fullscreen" aria-label="Enter full screen" title="Enter full screen" data-icon="fullscreen"></button>
         </div>
-        <div id="video-grid" class="video-grid"></div>
-        <div id="stage-empty" class="stage-empty">
-          <p>You're the only one here.</p>
-          <button id="empty-invite" type="button" class="text-button">Invite someone</button>
-        </div>
-        <div id="reaction-layer" class="reaction-layer" aria-live="polite"></div>
+        <div id="videoGrid" class="video-grid"></div>
       </section>
-
-      <aside id="inspector" class="inspector" aria-label="Meeting sidebar" hidden>
-        <div class="inspector-header"><h2>Meeting sidebar</h2><button id="close-inspector" type="button" class="icon-btn" aria-label="Close sidebar" data-icon="close"></button></div>
-        <div class="inspector-tabs" role="tablist" aria-label="Meeting sidebar panels">
-          <button id="people-tab" type="button" role="tab" aria-controls="people-panel" aria-selected="true"><span data-icon="people"></span> People</button>
-          <button id="chat-tab" type="button" role="tab" aria-controls="chat-panel" aria-selected="false" tabindex="-1"><span data-icon="chat"></span> Chat</button>
-          <button id="notes-tab" type="button" role="tab" aria-controls="notes-panel" aria-selected="false" tabindex="-1"><span data-icon="note"></span> Notes</button>
-        </div>
-        <section id="people-panel" class="participants" role="tabpanel" aria-labelledby="people-tab">
-          <ul id="people-list"></ul>
-        </section>
-        <section id="chat-panel" class="chat-panel" role="tabpanel" aria-labelledby="chat-tab" hidden>
-          <div id="chat-messages" class="chat-messages" role="log" aria-label="Meeting chat"><p id="chat-empty" class="panel-empty">No messages yet. Say hello.</p></div>
-          <form id="chat-form" class="chat-form"><label for="chat-input" class="sr-only">Message</label><input id="chat-input" placeholder="Write a message…" maxlength="500" required><button class="icon-btn primary" type="submit" aria-label="Send message" data-icon="send"></button></form>
-        </section>
-        <section id="notes-panel" class="notes-panel" role="tabpanel" aria-labelledby="notes-tab" hidden>
-          <label for="meeting-notes">Private notes</label>
-          <p>Saved on this device for this room.</p>
-          <textarea id="meeting-notes" placeholder="Add an agenda or jot down next steps…" maxlength="12000"></textarea>
-          <button id="download-notes" type="button" class="secondary"><span data-icon="download"></span> Download notes</button>
-        </section>
-      </aside>
     </div>
 
     <footer class="meeting-footer">
       <div class="dock" aria-label="Meeting controls">
-        <button id="mic-button" type="button" class="dock-btn" aria-label="Microphone" aria-pressed="false"><span data-icon="mic"></span><span>Mic</span></button>
-        <button id="camera-button" type="button" class="dock-btn" aria-label="Camera" aria-pressed="false"><span data-icon="video"></span><span>Camera</span></button>
-        <button id="share-button" type="button" class="dock-btn" aria-label="Share screen" aria-pressed="false"><span data-icon="screen"></span><span>Share</span></button>
-        <div class="reaction-control">
-          <button id="reaction-button" type="button" class="dock-btn" aria-expanded="false" aria-controls="reactions"><span data-icon="smile"></span><span>React</span></button>
-          <div id="reactions" class="reaction-popover" aria-label="Send a reaction" hidden></div>
-        </div>
-        <button id="hand-button" type="button" class="dock-btn" aria-label="Raise hand" aria-pressed="false"><span data-icon="hand"></span><span>Hand</span></button>
-        <button id="people-button" type="button" class="dock-btn" aria-controls="inspector" aria-pressed="false"><span data-icon="people"></span><span>People</span></button>
-        <button id="chat-button" type="button" class="dock-btn" aria-controls="inspector" aria-pressed="false"><span data-icon="chat"></span><span>Chat</span><span id="chat-unread" class="unread-badge" hidden></span></button>
-        <button id="notes-button" type="button" class="dock-btn" aria-controls="inspector" aria-pressed="false"><span data-icon="note"></span><span>Notes</span></button>
+        <button id="micBtn" type="button" class="dock-btn" aria-label="Microphone" aria-pressed="true"><span data-icon="mic"></span><span>Mic</span></button>
+        <button id="camBtn" type="button" class="dock-btn" aria-label="Camera" aria-pressed="true"><span data-icon="video"></span><span>Camera</span></button>
+        <button id="screenBtn" type="button" class="dock-btn" aria-label="Share screen" aria-pressed="false"><span data-icon="screen"></span><span>Share</span></button>
       </div>
-      <button id="leave-button" type="button" class="leave-button"><span data-icon="phone"></span><span>Leave</span></button>
+      <button id="leaveBtn" type="button" class="leave-button"><span data-icon="phone"></span><span>Leave</span></button>
     </footer>
   </main>
-
-  <dialog id="invite-dialog" class="dialog" aria-labelledby="invite-title">
-    <form method="dialog" class="dialog-header"><h2 id="invite-title">Invite people</h2><button class="icon-btn" aria-label="Close" data-icon="close"></button></form>
-    <p>Anyone with the link or room code can join.</p>
-    <label for="invite-link">Invite link</label>
-    <input id="invite-link" readonly>
-    <div class="dialog-actions">
-      <button id="copy-code" type="button" class="secondary">Copy code</button>
-      <button id="copy-invite" type="button" class="primary"><span data-icon="copy"></span> Copy link</button>
-    </div>
-  </dialog>
-
-  <dialog id="share-dialog" class="dialog" aria-labelledby="share-title">
-    <form method="dialog" class="dialog-header"><h2 id="share-title">Share your screen</h2><button class="icon-btn" aria-label="Close" data-icon="close"></button></form>
-    <p>Choose a tab, window, or screen in your browser's screen picker.</p>
-    <label class="checkbox-line"><input id="share-audio" type="checkbox"> Include audio when available</label>
-    <button id="start-share" type="button" class="primary"><span data-icon="screen"></span> Choose what to share</button>
-  </dialog>
 
   <dialog id="shortcuts-dialog" class="dialog" aria-labelledby="shortcuts-title">
     <form method="dialog" class="dialog-header"><h2 id="shortcuts-title">Keyboard shortcuts</h2><button class="icon-btn" aria-label="Close" data-icon="close"></button></form>
     <dl class="shortcut-list">
-      <div><dt>Toggle microphone</dt><dd><kbd>M</kbd> / <kbd>1</kbd></dd></div>
-      <div><dt>Toggle camera</dt><dd><kbd>V</kbd> / <kbd>2</kbd></dd></div>
+      <div><dt>Toggle microphone</dt><dd><kbd>1</kbd></dd></div>
+      <div><dt>Toggle camera</dt><dd><kbd>2</kbd></dd></div>
       <div><dt>Share screen with audio</dt><dd><kbd>3</kbd></dd></div>
-      <div><dt>Open screen share options</dt><dd><kbd>S</kbd></dd></div>
-      <div><dt>Raise or lower hand</dt><dd><kbd>H</kbd></dd></div>
-      <div><dt>Open chat</dt><dd><kbd>C</kbd></dd></div>
-      <div><dt>Open private notes</dt><dd><kbd>N</kbd></dd></div>
-      <div><dt>Toggle fullscreen</dt><dd><kbd>F</kbd></dd></div>
     </dl>
   </dialog>
-
-  <template id="tile-template">
-    <article class="video-tile">
-      <video autoplay playsinline></video>
-      <canvas class="relay-video" aria-hidden="true"></canvas>
-      <div class="avatar" aria-hidden="true"></div>
-      <div class="tile-meta">
-        <span class="tile-name"></span>
-        <span class="tile-muted" aria-label="Microphone muted" title="Microphone muted" data-icon="micOff" hidden></span>
-        <span class="tile-sharing" aria-label="Sharing screen" title="Sharing screen" data-icon="screen" hidden></span>
-        <span class="tile-hand" aria-label="Hand raised" title="Hand raised" data-icon="hand" hidden></span>
-        <span class="tile-connection" hidden></span>
-      </div>
-      <div class="tile-actions">
-        <button class="icon-btn tile-pin" type="button" aria-label="Pin video" title="Pin video" aria-pressed="false" data-icon="pin"></button>
-        <button class="icon-btn tile-fullscreen" type="button" aria-label="Fullscreen video" title="Fullscreen video" data-icon="fullscreen"></button>
-      </div>
-    </article>
-  </template>
-  <div id="toast-stack" class="toast-stack" role="status"></div>
 </body>
 </html>

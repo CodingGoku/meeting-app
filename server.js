@@ -4,65 +4,13 @@ const WebSocket = require('ws');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const fs = require('fs');
-const { createHmac } = require('crypto');
-const { createRelayState, requestMediaRelay, forwardRelayPacket, removeRelayPeer } = require('./media-relay');
 
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
 
 // Store rooms with participant details
-const rooms = new Map(); // roomId -> Map of participantId -> participant
-const reactions = new Set(['👍', '👏', '❤️', '🎉', '😂', '😮']);
-const activityCooldowns = { 'chat-message': 400, reaction: 650, 'hand-raised': 250 };
-const maxChatLength = 500;
-const maxBufferedBytes = 64 * 1024;
-const turnCredentialLifetime = 6 * 60 * 60;
-const turnConfig = readTurnConfig(process.env);
-
-function readTurnConfig({ TURN_URLS, TURN_SECRET, TURN_USERNAME, TURN_CREDENTIAL }) {
-    if (!TURN_URLS && !TURN_SECRET && !TURN_USERNAME && !TURN_CREDENTIAL) {
-        // Open Relay publishes these static-auth settings for shared use.
-        return {
-            urls: [
-                'turn:staticauth.openrelay.metered.ca:80?transport=udp',
-                'turn:staticauth.openrelay.metered.ca:443?transport=udp',
-                'turn:staticauth.openrelay.metered.ca:443?transport=tcp'
-            ],
-            secret: 'openrelayprojectsecret'
-        };
-    }
-
-    const urls = TURN_URLS?.split(',').map(url => url.trim());
-    const urlPattern = /^turns?:(?:\[[0-9a-f:.]+\]|[a-z0-9.-]+)(?::([0-9]{1,5}))?(?:\?transport=(?:udp|tcp))?$/i;
-    if (!urls?.length || !urls.every(url => {
-        const match = url.match(urlPattern);
-        return match && (!match[1] || (Number(match[1]) > 0 && Number(match[1]) <= 65535));
-    })) {
-        console.warn('TURN is disabled. Set TURN_URLS to valid comma-separated TURN URLs.');
-        return;
-    }
-    if (TURN_SECRET) return { urls, secret: TURN_SECRET };
-    if (TURN_USERNAME && TURN_CREDENTIAL) return { urls, username: TURN_USERNAME, credential: TURN_CREDENTIAL };
-
-    console.warn('TURN is disabled. Set TURN_SECRET or both TURN_USERNAME and TURN_CREDENTIAL.');
-}
-
-function getIceServers(participantId) {
-    if (!turnConfig) return;
-    const { urls, secret, username, credential } = turnConfig;
-    if (!secret) return [{ urls, username, credential }];
-
-    const expiresAt = Math.floor(Date.now() / 1000) + turnCredentialLifetime;
-    const temporaryUsername = `${expiresAt}:${participantId}`;
-    const temporaryCredential = createHmac('sha1', secret).update(temporaryUsername).digest('base64');
-    return [{ urls, username: temporaryUsername, credential: temporaryCredential }];
-}
-
-function parseMediaState(value) {
-    if (typeof value?.camera !== 'boolean' || typeof value.mic !== 'boolean' || typeof value.sharing !== 'boolean') return;
-    return { camera: value.camera, mic: value.mic, sharing: value.sharing };
-}
+const rooms = new Map(); // roomId -> Map of participantId -> { ws, userId, userName, joinedAt }
 
 // Serve static files from 'public' folder
 const publicPath = path.join(__dirname, 'public');
@@ -111,27 +59,13 @@ const wss = new WebSocket.Server({
 
 console.log('WebSocket server created successfully');
 
-const heartbeat = setInterval(() => {
-    for (const ws of wss.clients) {
-        if (ws.readyState !== WebSocket.OPEN) continue;
-        if (ws.isAlive) {
-            ws.isAlive = false;
-            ws.ping();
-        } else {
-            ws.terminate();
-        }
-    }
-}, 25000);
-heartbeat.unref();
-wss.on('close', () => clearInterval(heartbeat));
-
 // WebSocket connection handling
 wss.on('connection', (ws, req) => {
     const participantId = uuidv4();
     let currentRoomId = null;
+    let currentUserId = null;
+    let currentUserName = null;
     const connectionTime = new Date();
-    ws.isAlive = true;
-    ws.on('pong', () => { ws.isAlive = true; });
 
     console.log(`[${new Date().toISOString()}] New WebSocket connection: ${participantId} from ${req.socket.remoteAddress}`);
 
@@ -143,40 +77,27 @@ wss.on('connection', (ws, req) => {
     }));
 
     // Handle incoming messages
-    ws.on('message', (message, isBinary) => {
+    ws.on('message', (message) => {
         try {
-            if (isBinary) {
-                forwardRelayPacket(rooms.get(currentRoomId), participantId, message);
-                return;
-            }
             const data = JSON.parse(message.toString());
+            console.log(`[${new Date().toISOString()}] Message from ${participantId}: ${data.type}`);
 
             switch (data.type) {
                 case 'join-room':
-                    if (!currentRoomId && handleJoinRoom(ws, participantId, data)) {
-                        currentRoomId = data.roomId;
-                    }
+                    handleJoinRoom(ws, participantId, data);
+                    currentRoomId = data.roomId;
+                    currentUserId = data.userId;
+                    currentUserName = data.userName;
                     break;
                     
                 case 'offer':
                 case 'answer':
                 case 'ice-candidate':
-                    forwardToParticipant(participantId, data, currentRoomId);
-                    break;
-
-                case 'relay-request':
-                    requestMediaRelay(rooms.get(currentRoomId), participantId, data.toParticipantId);
-                    break;
-
-                case 'chat-message':
-                case 'reaction':
-                case 'hand-raised':
-                case 'media-state':
-                    broadcastRoomActivity(participantId, data, currentRoomId);
+                    forwardToParticipant(ws, data, currentRoomId);
                     break;
                     
                 case 'leave-room':
-                    handleLeaveRoom(participantId, currentRoomId);
+                    handleLeaveRoom(ws, participantId, currentRoomId);
                     currentRoomId = null;
                     break;
                     
@@ -205,7 +126,7 @@ wss.on('connection', (ws, req) => {
     ws.on('close', (code, reason) => {
         console.log(`[${new Date().toISOString()}] WebSocket closed: ${participantId} - Code: ${code}, Reason: ${reason || 'No reason provided'}`);
         if (currentRoomId) {
-            handleLeaveRoom(participantId, currentRoomId);
+            handleLeaveRoom(ws, participantId, currentRoomId);
         }
     });
 
@@ -217,22 +138,17 @@ wss.on('connection', (ws, req) => {
 
 function handleJoinRoom(ws, participantId, data) {
     try {
-        const { roomId, userId, userName, connectionKey } = data;
+        const { roomId, userId, userName } = data;
         
-        if (typeof roomId !== 'string' || !roomId.trim() || roomId.length > 128 ||
-            typeof userId !== 'string' || !userId.trim() || userId.length > 128 ||
-            (userName != null && (typeof userName !== 'string' || userName.length > 80)) ||
-            (connectionKey != null && (typeof connectionKey !== 'string' || connectionKey.length > 64))) {
+        if (!roomId || !userId) {
+            console.error('Invalid join data:', data);
             ws.send(JSON.stringify({
                 type: 'error',
                 message: 'Invalid join data'
             }));
-            return false;
+            return;
         }
 
-        const participantName = userName?.trim() || `User ${userId.slice(0, 4)}`;
-        const media = parseMediaState(data.media);
-        const relayMedia = data.relayMedia === true;
         // Create room if it doesn't exist
         if (!rooms.has(roomId)) {
             rooms.set(roomId, new Map());
@@ -241,33 +157,34 @@ function handleJoinRoom(ws, participantId, data) {
         
         const room = rooms.get(roomId);
         
-        // Keep a live participant's identity bound to their socket.
+        // Check if user already exists in room (reconnection)
+        let existingParticipantId = null;
         for (const [pid, participant] of room.entries()) {
             if (participant.userId === userId) {
-                const active = participant.ws.readyState === WebSocket.OPEN;
-                if (active && (!connectionKey || participant.connectionKey !== connectionKey)) {
-                    ws.send(JSON.stringify({
-                        type: 'error',
-                        message: 'This participant is already in the meeting'
-                    }));
-                    return false;
-                }
-                removeParticipant(room, pid);
-                if (active) participant.ws.close(4001, 'Connection replaced');
+                existingParticipantId = pid;
                 break;
             }
+        }
+        
+        if (existingParticipantId) {
+            // Remove existing connection
+            const oldParticipant = room.get(existingParticipantId);
+            if (oldParticipant.ws !== ws) {
+                try {
+                    oldParticipant.ws.close();
+                } catch (err) {
+                    console.error('Error closing old connection:', err);
+                }
+            }
+            room.delete(existingParticipantId);
+            console.log(`[${new Date().toISOString()}] Replaced existing connection for user ${userName || userId}`);
         }
         
         // Add new participant
         room.set(participantId, { 
             ws, 
             userId, 
-            userName: participantName,
-            connectionKey,
-            raised: false,
-            media,
-            relay: createRelayState(relayMedia),
-            lastActivity: {},
+            userName: userName || `User ${userId.slice(0,4)}`,
             joinedAt: new Date().toISOString()
         });
         
@@ -276,10 +193,7 @@ function handleJoinRoom(ws, participantId, data) {
             type: 'user-joined',
             participantId: participantId,
             userId: userId,
-            userName: participantName,
-            raised: false,
-            media,
-            relayMedia
+            userName: userName || `User ${userId.slice(0,4)}`
         };
         
         for (const [pid, participant] of room.entries()) {
@@ -299,10 +213,7 @@ function handleJoinRoom(ws, participantId, data) {
                 existingParticipants.push({ 
                     participantId: pid, 
                     userId: participant.userId,
-                    userName: participant.userName,
-                    raised: participant.raised,
-                    media: participant.media,
-                    relayMedia: Boolean(participant.relay)
+                    userName: participant.userName
                 });
             }
         }
@@ -311,19 +222,14 @@ function handleJoinRoom(ws, participantId, data) {
             ws.send(JSON.stringify({
                 type: 'existing-participants',
                 participants: existingParticipants,
-                iceServers: getIceServers(participantId),
-                mediaRelay: true,
                 yourInfo: {
                     userId: userId,
-                    userName: participantName,
-                    raised: false,
-                    media
+                    userName: userName || `User ${userId.slice(0,4)}`
                 }
             }));
         }
         
         console.log(`[${new Date().toISOString()}] User ${userName || userId} joined room ${roomId}. Total participants: ${room.size}`);
-        return true;
         
     } catch (error) {
         console.error('Error in handleJoinRoom:', error);
@@ -333,46 +239,42 @@ function handleJoinRoom(ws, participantId, data) {
                 message: 'Failed to join room'
             }));
         }
-        return false;
     }
 }
 
-function removeParticipant(room, participantId) {
-    const participant = room.get(participantId);
-    if (!participant) return;
-
-    removeRelayPeer(room, participantId, participant.relay);
-    room.delete(participantId);
-    const payload = JSON.stringify({
-        type: 'user-left',
-        userId: participant.userId,
-        userName: participant.userName
-    });
-    for (const member of room.values()) {
-        if (member.ws.readyState === WebSocket.OPEN) {
-            try {
-                member.ws.send(payload);
-            } catch (error) {
-                console.error('Error notifying about leave:', error);
+function handleLeaveRoom(ws, participantId, roomId) {
+    try {
+        if (!roomId || !rooms.has(roomId)) return;
+        
+        const room = rooms.get(roomId);
+        const participant = room.get(participantId);
+        
+        if (!participant) return;
+        
+        const leaveInfo = {
+            type: 'user-left',
+            userId: participant.userId,
+            userName: participant.userName
+        };
+        
+        // Notify all other participants
+        for (const [pid, p] of room.entries()) {
+            if (pid !== participantId && p.ws.readyState === WebSocket.OPEN) {
+                try {
+                    p.ws.send(JSON.stringify(leaveInfo));
+                } catch (err) {
+                    console.error('Error notifying about leave:', err);
+                }
             }
         }
-    }
-    return participant;
-}
-
-function handleLeaveRoom(participantId, roomId) {
-    try {
-        const room = rooms.get(roomId);
-        if (!room) return;
-
-        const participant = removeParticipant(room, participantId);
-        if (!participant) return;
+        
+        room.delete(participantId);
         console.log(`[${new Date().toISOString()}] User ${participant.userName || participant.userId} left room ${roomId}. Remaining: ${room.size}`);
         
         // Delete empty rooms after 30 seconds (to allow for reconnections)
         if (room.size === 0) {
             setTimeout(() => {
-                if (rooms.get(roomId) === room && room.size === 0) {
+                if (rooms.has(roomId) && rooms.get(roomId).size === 0) {
                     rooms.delete(roomId);
                     console.log(`[${new Date().toISOString()}] Deleted empty room: ${roomId}`);
                 }
@@ -384,75 +286,32 @@ function handleLeaveRoom(participantId, roomId) {
     }
 }
 
-function broadcastRoomActivity(participantId, data, roomId) {
-    const room = rooms.get(roomId);
-    const sender = room?.get(participantId);
-    if (!sender) return;
-
-    const { type } = data;
-    const now = Date.now();
-    const cooldown = activityCooldowns[type];
-    if (cooldown && now - (sender.lastActivity[type] ?? 0) < cooldown) return;
-
-    const message = { type, userId: sender.userId, userName: sender.userName };
-    switch (type) {
-        case 'chat-message': {
-            if (typeof data.text !== 'string' || data.text.length > maxChatLength) return;
-            const text = data.text.trim();
-            if (!text) return;
-            message.text = text;
-            message.timestamp = new Date(now).toISOString();
-            break;
-        }
-        case 'reaction':
-            if (!reactions.has(data.reaction)) return;
-            message.reaction = data.reaction;
-            break;
-        case 'hand-raised':
-            if (typeof data.raised !== 'boolean' || sender.raised === data.raised) return;
-            sender.raised = data.raised;
-            message.raised = sender.raised;
-            break;
-        case 'media-state': {
-            const media = parseMediaState(data);
-            if (!media || (sender.media?.camera === media.camera &&
-                sender.media.mic === media.mic && sender.media.sharing === media.sharing)) return;
-            sender.media = media;
-            message.media = media;
-            break;
-        }
-    }
-
-    sender.lastActivity[type] = now;
-    const payload = JSON.stringify(message);
-    for (const participant of room.values()) {
-        if (participant.ws.readyState === WebSocket.OPEN && participant.ws.bufferedAmount < maxBufferedBytes) {
-            participant.ws.send(payload);
-        }
-    }
-}
-
-function forwardToParticipant(participantId, data, roomId) {
+function forwardToParticipant(ws, data, roomId) {
     try {
+        if (!roomId || !rooms.has(roomId)) return;
+        
         const room = rooms.get(roomId);
-        const sender = room?.get(participantId);
-        if (!sender) return;
-
-        for (const [targetId, participant] of room.entries()) {
-            if (participant.userId !== data.to) continue;
-            if (data.toParticipantId != null && data.toParticipantId !== targetId) return;
-            if (participant.ws.readyState !== WebSocket.OPEN) break;
-
-            participant.ws.send(JSON.stringify({
+        let targetParticipant = null;
+        
+        // Find target participant
+        for (const [_, participant] of room.entries()) {
+            if (participant.userId === data.to) {
+                targetParticipant = participant;
+                break;
+            }
+        }
+        
+        if (targetParticipant && targetParticipant.ws.readyState === WebSocket.OPEN) {
+            targetParticipant.ws.send(JSON.stringify({
                 type: data.type,
-                from: sender.userId,
-                fromName: sender.userName,
-                fromParticipantId: participantId,
+                from: data.from,
+                fromName: data.fromName,
                 data: data.data
             }));
-            return;
+        } else {
+            // Target not found or not open
+            console.log(`Target ${data.to} not found or not connected in room ${roomId}`);
         }
-        console.log(`Target ${data.to} not found or not connected in room ${roomId}`);
         
     } catch (error) {
         console.error('Error in forwardToParticipant:', error);
@@ -466,7 +325,7 @@ setInterval(() => {
         for (const [participantId, participant] of room.entries()) {
             if (participant.ws.readyState !== WebSocket.OPEN) {
                 console.log(`Cleaning up inactive participant ${participantId} in room ${roomId}`);
-                removeParticipant(room, participantId);
+                room.delete(participantId);
             }
         }
         
