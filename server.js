@@ -5,6 +5,7 @@ const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const fs = require('fs');
 const { createHmac } = require('crypto');
+const { createRelayState, requestMediaRelay, forwardRelayPacket, removeRelayPeer } = require('./media-relay');
 
 const app = express();
 const server = http.createServer(app);
@@ -142,8 +143,12 @@ wss.on('connection', (ws, req) => {
     }));
 
     // Handle incoming messages
-    ws.on('message', (message) => {
+    ws.on('message', (message, isBinary) => {
         try {
+            if (isBinary) {
+                forwardRelayPacket(rooms.get(currentRoomId), participantId, message);
+                return;
+            }
             const data = JSON.parse(message.toString());
 
             switch (data.type) {
@@ -157,6 +162,10 @@ wss.on('connection', (ws, req) => {
                 case 'answer':
                 case 'ice-candidate':
                     forwardToParticipant(participantId, data, currentRoomId);
+                    break;
+
+                case 'relay-request':
+                    requestMediaRelay(rooms.get(currentRoomId), participantId, data.toParticipantId);
                     break;
 
                 case 'chat-message':
@@ -223,6 +232,7 @@ function handleJoinRoom(ws, participantId, data) {
 
         const participantName = userName?.trim() || `User ${userId.slice(0, 4)}`;
         const media = parseMediaState(data.media);
+        const relayMedia = data.relayMedia === true;
         // Create room if it doesn't exist
         if (!rooms.has(roomId)) {
             rooms.set(roomId, new Map());
@@ -256,6 +266,7 @@ function handleJoinRoom(ws, participantId, data) {
             connectionKey,
             raised: false,
             media,
+            relay: createRelayState(relayMedia),
             lastActivity: {},
             joinedAt: new Date().toISOString()
         });
@@ -267,7 +278,8 @@ function handleJoinRoom(ws, participantId, data) {
             userId: userId,
             userName: participantName,
             raised: false,
-            media
+            media,
+            relayMedia
         };
         
         for (const [pid, participant] of room.entries()) {
@@ -289,7 +301,8 @@ function handleJoinRoom(ws, participantId, data) {
                     userId: participant.userId,
                     userName: participant.userName,
                     raised: participant.raised,
-                    media: participant.media
+                    media: participant.media,
+                    relayMedia: Boolean(participant.relay)
                 });
             }
         }
@@ -299,6 +312,7 @@ function handleJoinRoom(ws, participantId, data) {
                 type: 'existing-participants',
                 participants: existingParticipants,
                 iceServers: getIceServers(participantId),
+                mediaRelay: true,
                 yourInfo: {
                     userId: userId,
                     userName: participantName,
@@ -327,6 +341,7 @@ function removeParticipant(room, participantId) {
     const participant = room.get(participantId);
     if (!participant) return;
 
+    removeRelayPeer(room, participantId, participant.relay);
     room.delete(participantId);
     const payload = JSON.stringify({
         type: 'user-left',
@@ -451,7 +466,7 @@ setInterval(() => {
         for (const [participantId, participant] of room.entries()) {
             if (participant.ws.readyState !== WebSocket.OPEN) {
                 console.log(`Cleaning up inactive participant ${participantId} in room ${roomId}`);
-                room.delete(participantId);
+                removeParticipant(room, participantId);
             }
         }
         

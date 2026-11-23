@@ -7,8 +7,8 @@
   <meta name="description" content="Start or join a video meeting with MeetStream Pro.">
   <title>MeetStream Pro</title>
   <link rel="icon" href="assets/meetstream-icon.webp" type="image/webp">
-  <link rel="stylesheet" href="styles.css?v=3">
-  <script type="module" src="app.js?v=3"></script>
+  <link rel="stylesheet" href="styles.css?v=4">
+  <script type="module" src="app.js?v=4"></script>
 </head>
 <body>
   <main id="lobby" class="lobby-shell">
@@ -166,6 +166,7 @@
   <template id="tile-template">
     <article class="video-tile">
       <video autoplay playsinline></video>
+      <canvas class="relay-video" aria-hidden="true"></canvas>
       <div class="avatar" aria-hidden="true"></div>
       <div class="tile-meta">
         <span class="tile-name"></span>

@@ -1,5 +1,6 @@
-import { initIcons, setIcon } from './icons.js?v=3';
-import { MeetingMedia } from './media.js?v=3';
+import { initIcons, setIcon } from './icons.js?v=4';
+import { MeetingMedia } from './media.js?v=4';
+import { RelayMedia } from './relay-media.js?v=4';
 
 const $ = id => document.getElementById(id);
 const lobby = $('lobby');
@@ -16,6 +17,10 @@ const reactions = [
 const sidebarTabs = ['people', 'chat', 'notes'];
 const roomCodePattern = /^[A-Z0-9]{4,16}$/;
 const resumeKey = 'meetstream_active';
+const relayHeaderSize = 37;
+const relayDeadlineMs = 6500;
+const relayEncoder = new TextEncoder();
+const relayDecoder = new TextDecoder();
 const fallbackStorage = new Map();
 let active = null;
 let mode = 'join';
@@ -225,7 +230,7 @@ function setPerson(session, id, name, raised = false, media) {
     tile.querySelector('.tile-pin').addEventListener('click', () => setPin(session, id));
     const fullscreen = tile.querySelector('.tile-fullscreen');
     fullscreen.addEventListener('click', () => toggleFullscreen(tile));
-    person = { id, tile, video, local: id === session.id };
+    person = { id, tile, video, canvas: tile.querySelector('canvas'), local: id === session.id };
     session.people.set(id, person);
     $('video-grid').append(tile);
   }
@@ -246,6 +251,11 @@ function setPerson(session, id, name, raised = false, media) {
 function removePerson(session, id) {
   if (session.pinned === id) setPin(session, id);
   const person = session.people.get(id);
+  clearTimeout(person?.relayTimer);
+  if (person?.relayed) {
+    session.relayPeople.delete(person.participantId);
+    session.relay.removePeer(person.participantId);
+  }
   person?.tile.remove();
   session.people.delete(id);
   syncMeetingActions(session);
@@ -259,16 +269,20 @@ function showStream(person, stream, hasVideo) {
 }
 
 function setPersonMedia(session, person, state) {
+  if (person.relayed && (person.media?.sharing !== state.sharing || person.media?.camera !== state.camera)) {
+    person.relayFrame = false;
+  }
   person.media = state;
   person.tile.classList.toggle('is-sharing', state.sharing);
   person.tile.querySelector('.tile-sharing').hidden = !state.sharing;
   person.tile.querySelector('.tile-muted').hidden = state.mic !== false;
-  if (!person.local) renderRemote(session, person, person.video.srcObject);
+  if (person.relayed) updateRelayTile(person);
+  else if (!person.local) renderRemote(session, person, person.video.srcObject);
   syncMeetingActions(session);
 }
 
 function renderRemote(session, person, stream) {
-  if (!person) return;
+  if (!person || person.relayed) return;
   const hasVideo = (person.media == null || person.media.camera || person.media.sharing) &&
     Boolean(stream?.getVideoTracks().some(track => !track.muted && track.readyState === 'live'));
   showStream(person, stream, hasVideo);
@@ -296,7 +310,7 @@ function playRemote(session, person) {
 function syncMeetingActions(session) {
   if (active !== session) return;
   const people = [...session.people.values()];
-  $('enable-audio').hidden = !people.some(person => person.awaitingAudio);
+  $('enable-audio').hidden = !session.relayAudioBlocked && !people.some(person => person.awaitingAudio);
   $('retry-media').hidden = !session.ready || !people.some(person => person.connection === 'failed');
   $('video-grid').classList.toggle('has-share', people.some(person => person.media?.sharing));
   if (!session.ready) return;
@@ -304,7 +318,8 @@ function syncMeetingActions(session) {
   let label = 'Connected';
   if (remote.some(person => person.connection === 'failed')) label = 'Media needs attention';
   else if (remote.some(person => person.connection === 'reconnecting')) label = 'Reconnecting media…';
-  else if (remote.some(person => person.connection !== 'connected')) label = 'Connecting media…';
+  else if (remote.some(person => !['connected', 'relayed'].includes(person.connection))) label = 'Connecting media…';
+  else if (remote.some(person => person.relayed)) label = 'Server relay';
   setConnection(label);
 }
 
@@ -312,10 +327,101 @@ function updatePeerStatus(session, id, status) {
   const person = session.people.get(id);
   if (!person || active !== session) return;
   person.connection = status;
+  if (status === 'connected') {
+    clearTimeout(person.relayTimer);
+    person.relayTimer = null;
+  } else if (status === 'failed' || status === 'reconnecting') {
+    scheduleRelay(session, person, status === 'failed' ? 0 : relayDeadlineMs);
+  }
   const badge = person.tile.querySelector('.tile-connection');
   badge.hidden = status === 'connected';
-  badge.textContent = { connecting: 'Connecting…', reconnecting: 'Reconnecting…', failed: 'Media unavailable' }[status] || '';
+  badge.textContent = {
+    connecting: 'Connecting…', reconnecting: 'Reconnecting…',
+    failed: 'Media unavailable', relayed: 'Server relay'
+  }[status] || '';
   syncMeetingActions(session);
+}
+
+function scheduleRelay(session, person, delay = relayDeadlineMs) {
+  if (!session.canRelay || !person.canRelay || person.relayed || person.connection === 'connected') return;
+  if (person.relayTimer && delay > 0) return;
+  clearTimeout(person.relayTimer);
+  person.relayTimer = setTimeout(() => {
+    person.relayTimer = null;
+    if (person.connection !== 'connected') {
+      send(session, 'relay-request', { toParticipantId: person.participantId });
+    }
+  }, delay);
+}
+
+function addRemotePerson(session, info, initiate) {
+  const previous = session.people.get(info.userId);
+  if (previous && previous.participantId !== info.participantId) {
+    session.media.removePeer(info.userId);
+    removePerson(session, info.userId);
+  }
+  const person = setPerson(session, info.userId, info.userName, info.raised, info.media);
+  person.participantId = info.participantId;
+  person.canRelay = info.relayMedia === true;
+  // Run the fallback deadline outside the per-peer SDP queue.
+  scheduleRelay(session, person);
+  if (!person.relayed) void session.media.addPeer(info.userId, initiate, info.participantId);
+}
+
+function startMediaRelay(session, { userId, participantId }) {
+  const person = session.people.get(userId);
+  if (!person || person.participantId !== participantId || person.relayed || !person.canRelay) return;
+  clearTimeout(person.relayTimer);
+  person.relayTimer = null;
+  person.relayed = true;
+  person.relayAddress = relayEncoder.encode(participantId);
+  person.awaitingAudio = false;
+  session.media.removePeer(userId);
+  session.relayPeople.set(participantId, person);
+  session.relay.addPeer(participantId);
+  updatePeerStatus(session, userId, 'relayed');
+  if (session.relayPeople.size === 1) {
+    notify('Direct media couldn’t connect. Audio and video are using the meeting server.');
+  }
+}
+
+function updateRelayTile(person) {
+  const visible = person.relayFrame && (person.media == null || person.media.camera || person.media.sharing);
+  person.tile.classList.toggle('has-relay-video', Boolean(visible));
+}
+
+function drawRelayFrame(session, participantId, image) {
+  const person = session.relayPeople.get(participantId);
+  if (active !== session || !person) return;
+  const { canvas } = person;
+  if (canvas.width !== image.width || canvas.height !== image.height) {
+    canvas.width = image.width;
+    canvas.height = image.height;
+  }
+  canvas.getContext('2d', { alpha: false }).drawImage(image, 0, 0);
+  person.relayFrame = true;
+  updateRelayTile(person);
+}
+
+function sendRelayFrame(session, participantId, kind, payload) {
+  const { socket } = session;
+  const person = session.relayPeople.get(participantId);
+  if (active !== session || !session.ready || !person ||
+      socket?.readyState !== WebSocket.OPEN || socket.bufferedAmount > (kind === 1 ? 64 : 128) * 1024) return;
+  const packet = new Uint8Array(relayHeaderSize + payload.byteLength);
+  packet[0] = kind;
+  packet.set(person.relayAddress, 1);
+  packet.set(payload, relayHeaderSize);
+  socket.send(packet);
+}
+
+function receiveRelayFrame(session, data) {
+  if (!session.relayPeople.size || data.byteLength <= relayHeaderSize) return;
+  const packet = new Uint8Array(data);
+  const participantId = relayDecoder.decode(packet.subarray(1, relayHeaderSize));
+  if (session.relayPeople.has(participantId)) {
+    session.relay.receive(participantId, packet[0], packet.subarray(relayHeaderSize));
+  }
 }
 
 function updateToggle(button, enabled, label) {
@@ -336,6 +442,8 @@ function renderMedia(session, stream, state) {
   if (changed) updateRoster(session);
   person.tile.classList.toggle('is-mirrored', state.camera && !state.sharing);
   showStream(person, stream, state.camera || state.sharing);
+  session.relay?.setLocal(state.camera || state.sharing ? person.video : null,
+    session.media.outbound.getAudioTracks()[0] || null, state.sharing);
   const mic = $('mic-button');
   const camera = $('camera-button');
   mic.classList.toggle('is-off', !state.mic);
@@ -349,7 +457,7 @@ function renderMedia(session, stream, state) {
 
 function setConnection(value) {
   if ($('connection-label').textContent !== value) $('connection-label').textContent = value;
-  $('connection-indicator').classList.toggle('is-waiting', value !== 'Connected');
+  $('connection-indicator').classList.toggle('is-waiting', !['Connected', 'Server relay'].includes(value));
 }
 
 function tick(session) {
@@ -418,11 +526,11 @@ function handleMessage(session, data) {
         rememberRoom(session);
       }
       session.hasMediaState = Boolean(data.yourInfo?.media);
+      session.canRelay = data.mediaRelay === true;
       session.media.setIceServers(data.iceServers);
       rememberActiveMeeting(session);
       for (const person of data.participants) {
-        setPerson(session, person.userId, person.userName, person.raised, person.media);
-        void session.media.addPeer(person.userId, false, person.participantId);
+        addRemotePerson(session, person, false);
       }
       if (session.hasMediaState) send(session, 'media-state', session.mediaState);
       if (session.people.get(session.id).raised) send(session, 'hand-raised', { raised: true });
@@ -430,14 +538,16 @@ function handleMessage(session, data) {
       syncMeetingActions(session);
       break;
     case 'user-joined':
-      setPerson(session, data.userId, data.userName, data.raised, data.media);
+      addRemotePerson(session, data, true);
       updateRoster(session);
-      void session.media.addPeer(data.userId, true, data.participantId);
       break;
     case 'offer':
     case 'answer':
     case 'ice-candidate':
-      void session.media.handleSignal(data);
+      if (!session.people.get(data.from)?.relayed) void session.media.handleSignal(data);
+      break;
+    case 'media-relay':
+      startMediaRelay(session, data);
       break;
     case 'user-left':
       session.media.removePeer(data.userId);
@@ -479,18 +589,20 @@ function connect(session) {
   url.search = '';
   url.hash = '';
   const socket = new WebSocket(url);
+  socket.binaryType = 'arraybuffer';
   session.socket = socket;
   session.connectTimeout = setTimeout(() => socket.close(), 9000);
   socket.addEventListener('open', () => {
     socket.send(JSON.stringify({
       type: 'join-room', roomId: session.room, userId: session.id, userName: session.name,
-      connectionKey: session.connectionKey, media: session.mediaState
+      connectionKey: session.connectionKey, media: session.mediaState, relayMedia: Boolean(session.relay)
     }));
   });
   socket.addEventListener('message', event => {
     if (active !== session || socket !== session.socket || socket.readyState !== WebSocket.OPEN) return;
     try {
-      handleMessage(session, JSON.parse(event.data));
+      if (typeof event.data === 'string') handleMessage(session, JSON.parse(event.data));
+      else if (event.data instanceof ArrayBuffer) receiveRelayFrame(session, event.data);
     } catch (error) {
       console.warn('Meeting message could not be processed', error);
     }
@@ -528,7 +640,7 @@ async function enterMeeting(room, name) {
   if (active) return;
   const session = {
     id: makeUserId(), connectionKey: makeUserId(), room, name, people: new Map(), pinned: null,
-    mediaState: {}, failures: 0
+    mediaState: {}, failures: 0, relayPeople: new Map()
   };
   active = session;
   const devices = { mic: $('start-mic').checked, camera: $('start-camera').checked };
@@ -545,6 +657,16 @@ async function enterMeeting(room, name) {
       onStatus: (id, status) => updatePeerStatus(session, id, status),
       notify
     });
+    session.relay = new RelayMedia({
+      sendFrame: (id, kind, payload) => sendRelayFrame(session, id, kind, payload),
+      onVideo: (id, image) => drawRelayFrame(session, id, image),
+      onAudioBlocked: blocked => {
+        session.relayAudioBlocked = blocked;
+        syncMeetingActions(session);
+      },
+      notify
+    });
+    void session.relay.enableAudio();
     await session.media.prepare(devices);
     if (active !== session) return;
     save('meetstream_devices', JSON.stringify(devices));
@@ -579,6 +701,8 @@ function leaveMeeting({ returnToLobby = true } = {}) {
   clearTimeout(session.connectTimeout);
   clearInterval(session.timer);
   session.socket?.close();
+  for (const person of session.people.values()) clearTimeout(person.relayTimer);
+  session.relay?.destroy();
   session.media?.destroy();
   if (!returnToLobby) return;
   try {
@@ -754,6 +878,7 @@ $('fullscreen-button').addEventListener('click', () => toggleFullscreen());
 $('enable-audio').addEventListener('click', () => {
   const session = active;
   if (!session) return;
+  if (session.relayAudioBlocked) void session.relay.enableAudio();
   for (const person of session.people.values()) {
     if (!person.awaitingAudio || person.local) continue;
     person.video.muted = false;

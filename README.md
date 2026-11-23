@@ -11,3 +11,7 @@ WebRTC connects directly when the network permits it. MeetStream uses the shared
 - For a managed relay, set `TURN_USERNAME` and `TURN_CREDENTIAL` to its client ICE credentials. If you also set `TURN_SECRET`, MeetStream uses temporary credentials instead.
 
 Set these values as environment variables on the meeting server. Keep the TURN shared secret on the server. Browsers receive only the TURN URLs and client credentials they need to connect.
+
+## Server media fallback
+
+If a supported pair can't establish WebRTC, MeetStream tries the same connection it already uses for room signaling. The meeting displays **Server relay** when audio and video travel over WebSocket. The server forwards media without saving it. Relay video uses a lower frame rate and resolution, and public deployments should use HTTPS and secure WebSockets.
