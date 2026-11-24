@@ -1,997 +1,186 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="en" data-theme="light">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>MeetStream Pro - Screen Share with Audio</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>
-        /* (same CSS as previous version – keep unchanged) */
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Inter', sans-serif;
-            background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
-            height: 100vh;
-            overflow: hidden;
-            position: relative;
-        }
-        body::before {
-            content: '';
-            position: absolute;
-            width: 200%;
-            height: 200%;
-            background: radial-gradient(circle, rgba(102,126,234,0.1) 1px, transparent 1px);
-            background-size: 50px 50px;
-            animation: moveBackground 20s linear infinite;
-            pointer-events: none;
-        }
-        @keyframes moveBackground {
-            0% { transform: translate(0, 0); }
-            100% { transform: translate(50px, 50px); }
-        }
-        .join-container {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            padding: 20px;
-            position: relative;
-            z-index: 1;
-        }
-        .join-card {
-            background: rgba(255,255,255,0.95);
-            backdrop-filter: blur(20px);
-            border-radius: 32px;
-            padding: 40px 24px;
-            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
-            max-width: 480px;
-            width: 100%;
-            animation: slideUpFade 0.6s cubic-bezier(0.16,1,0.3,1);
-        }
-        @keyframes slideUpFade {
-            from { opacity: 0; transform: translateY(30px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .logo { text-align: center; margin-bottom: 24px; }
-        .logo-icon { font-size: 48px; background: linear-gradient(135deg,#667eea,#764ba2); -webkit-background-clip: text; background-clip: text; color: transparent; }
-        .logo h1 { font-size: 28px; font-weight: 800; margin-top: 12px; background: linear-gradient(135deg,#667eea,#764ba2); -webkit-background-clip: text; background-clip: text; color: transparent; }
-        .subtitle { text-align: center; color: #6b7280; font-size: 14px; margin-bottom: 24px; }
-        .input-group { margin-bottom: 16px; }
-        .input-group input { width: 100%; padding: 14px 18px; border: 2px solid #e5e7eb; border-radius: 24px; font-size: 16px; transition: all 0.3s; background: white; }
-        .input-group input:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 4px rgba(102,126,234,0.1); transform: translateY(-2px); }
-        .btn-primary, .btn-secondary { width: 100%; padding: 14px; border-radius: 24px; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.3s; border: none; }
-        .btn-primary { background: linear-gradient(135deg,#667eea,#764ba2); color: white; }
-        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 25px -5px rgba(102,126,234,0.4); }
-        .btn-secondary { background: rgba(102,126,234,0.1); color: #667eea; border: 2px solid rgba(102,126,234,0.2); }
-        .btn-secondary:hover { background: rgba(102,126,234,0.2); border-color: #667eea; transform: translateY(-2px); }
-        .or-divider { text-align: center; margin: 20px 0; color: #9ca3af; font-size: 14px; position: relative; }
-        .or-divider::before, .or-divider::after { content: ''; position: absolute; top: 50%; width: 45%; height: 1px; background: linear-gradient(90deg, transparent, #e5e7eb, transparent); }
-        .or-divider::before { left: 0; }
-        .or-divider::after { right: 0; }
-        .meeting-ui { display: none; height: 100vh; flex-direction: column; background: #0a0a0f; position: relative; z-index: 1; }
-        .header { background: rgba(10,10,15,0.8); backdrop-filter: blur(20px); padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); flex-shrink: 0; }
-        .room-info { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-        .room-label { color: #9ca3af; font-size: 12px; }
-        .room-code { background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 40px; font-family: monospace; font-size: 14px; font-weight: 600; color: white; }
-        .icon-btn { width: auto; padding: 6px 12px; background: rgba(255,255,255,0.1); border: none; border-radius: 40px; color: white; font-size: 12px; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 4px; }
-        .icon-btn:hover { background: rgba(255,255,255,0.2); }
-        .participant-count { background: rgba(102,126,234,0.2); backdrop-filter: blur(10px); padding: 4px 12px; border-radius: 40px; color: white; font-size: 12px; font-weight: 500; border: 1px solid rgba(102,126,234,0.3); }
-        .video-grid { flex: 1; display: flex; flex-wrap: wrap; gap: 12px; padding: 12px; overflow-y: auto; min-height: 0; transition: all 0.3s; }
-        .video-grid:not(.focus-mode) { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
-        .video-grid.focus-mode { display: flex; justify-content: center; align-items: center; }
-        .video-grid.focus-mode .video-card:not(.focused) { display: none; }
-        .video-grid.focus-mode .video-card.focused { width: 100%; height: 100%; max-width: none; margin: 0; }
-        .video-card { background: linear-gradient(135deg,#1a1a2e,#16213e); border-radius: 16px; overflow: hidden; position: relative; aspect-ratio: 16/9; box-shadow: 0 5px 20px rgba(0,0,0,0.3); transition: all 0.3s; border: 1px solid rgba(255,255,255,0.1); flex: 1 1 260px; }
-        .video-card:hover { transform: scale(1.02); border-color: rgba(102,126,234,0.5); }
-        .video-card video { width: 100%; height: 100%; object-fit: contain; background: #000; }
-        .participant-name { position: absolute; bottom: 10px; left: 10px; background: rgba(0,0,0,0.7); backdrop-filter: blur(5px); color: white; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 500; pointer-events: none; z-index: 2; }
-        .video-card-buttons { position: absolute; bottom: 10px; right: 10px; display: flex; gap: 6px; z-index: 3; }
-        .video-action-btn { background: rgba(0,0,0,0.7); backdrop-filter: blur(5px); border: none; color: white; font-size: 14px; padding: 4px; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
-        .video-action-btn:hover { background: rgba(102,126,234,0.8); transform: scale(1.1); }
-        .exit-focus-btn { position: fixed; bottom: 90px; right: 20px; background: rgba(0,0,0,0.8); backdrop-filter: blur(10px); color: white; border: none; padding: 8px 16px; border-radius: 40px; font-size: 12px; font-weight: 500; cursor: pointer; z-index: 100; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 10px rgba(0,0,0,0.3); }
-        .controls { display: flex; justify-content: center; gap: 12px; padding: 12px 16px; background: rgba(10,10,15,0.95); backdrop-filter: blur(20px); border-top: 1px solid rgba(255,255,255,0.1); flex-shrink: 0; }
-        .control-btn { width: 48px; height: 48px; border-radius: 40px; background: rgba(255,255,255,0.1); border: none; font-size: 22px; cursor: pointer; transition: all 0.2s; color: white; display: flex; align-items: center; justify-content: center; position: relative; }
-        .control-btn:hover { transform: scale(1.05); background: rgba(255,255,255,0.2); }
-        .control-btn.mic-off, .control-btn.cam-off { background: #ef4444; }
-        .control-btn.screen-active { background: #10b981; }
-        .control-btn.leave-btn { background: #ef4444; }
-        .control-btn::after { content: attr(data-tooltip); position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.9); color: white; padding: 4px 8px; border-radius: 8px; font-size: 10px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
-        .control-btn:hover::after { opacity: 1; }
-        .toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.9); backdrop-filter: blur(10px); color: white; padding: 8px 16px; border-radius: 40px; font-size: 12px; z-index: 1000; animation: slideUpFade 0.3s; pointer-events: none; border: 1px solid rgba(255,255,255,0.2); white-space: nowrap; }
-        .video-grid::-webkit-scrollbar { width: 4px; }
-        .video-grid::-webkit-scrollbar-track { background: rgba(255,255,255,0.1); border-radius: 10px; }
-        .video-grid::-webkit-scrollbar-thumb { background: rgba(102,126,234,0.5); border-radius: 10px; }
-        .share-dialog {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.95);
-            backdrop-filter: blur(20px);
-            border-radius: 24px;
-            padding: 24px;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            z-index: 200;
-            min-width: 280px;
-            text-align: center;
-            color: white;
-            border: 1px solid rgba(255,255,255,0.2);
-            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
-        }
-        .share-dialog label {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-            cursor: pointer;
-        }
-        .share-dialog button {
-            padding: 10px 20px;
-            border-radius: 40px;
-            border: none;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .share-dialog .confirm-btn {
-            background: #10b981;
-            color: white;
-        }
-        .share-dialog .confirm-btn:hover {
-            background: #059669;
-            transform: scale(1.02);
-        }
-        .share-dialog .cancel-btn {
-            background: #ef4444;
-            color: white;
-        }
-        .share-dialog .cancel-btn:hover {
-            background: #dc2626;
-        }
-        @media (max-width: 768px) {
-            .join-card { padding: 32px 20px; }
-            .video-grid { padding: 8px; gap: 8px; }
-            .video-grid:not(.focus-mode) { grid-template-columns: 1fr; }
-            .control-btn { width: 44px; height: 44px; font-size: 20px; }
-            .header { padding: 8px 12px; }
-            .room-code { font-size: 12px; padding: 3px 8px; }
-            .icon-btn { padding: 4px 10px; font-size: 11px; }
-            .participant-count { font-size: 11px; padding: 3px 10px; }
-            .video-action-btn { width: 26px; height: 26px; font-size: 12px; }
-            .exit-focus-btn { bottom: 90px; right: 12px; padding: 6px 12px; font-size: 11px; }
-            .share-dialog { width: 90%; padding: 20px; }
-        }
-    </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#e2f4ff">
+  <meta name="description" content="Start or join a video meeting with MeetStream Pro.">
+  <title>MeetStream Pro</title>
+  <link rel="icon" href="assets/marine-meetstream-icon.webp" type="image/webp">
+  <link rel="stylesheet" href="styles.css?v=7">
+  <script type="module" src="app.js?v=7"></script>
 </head>
 <body>
-    <div id="joinScreen" class="join-container">
-        <div class="join-card">
-            <div class="logo">
-                <div class="logo-icon">🎥</div>
-                <h1>MeetStream Pro</h1>
-            </div>
-            <div class="subtitle">Premium video meetings, now free</div>
-            <div class="input-group">
-                <input type="text" id="usernameInput" placeholder="Your name" autocomplete="off">
-            </div>
-            <div class="input-group">
-                <input type="text" id="roomCode" placeholder="Meeting code" autocomplete="off">
-            </div>
-            <button class="btn-primary" id="joinBtn">Join Meeting</button>
-            <div class="or-divider">or</div>
-            <button class="btn-secondary" id="createBtn">Create New Meeting</button>
-            <div style="text-align: center; margin-top: 20px; font-size: 11px; color: #9ca3af;">
-                🔒 End-to-end encrypted • HD quality • Screen sharing with audio
-            </div>
+  <main id="lobby" class="lobby-shell">
+    <header class="window-bar">
+      <div class="traffic-lights" aria-hidden="true"><i></i><i></i><i></i></div>
+      <div class="brand"><img class="brand-icon" src="assets/marine-meetstream-icon.webp" alt=""><span>MeetStream <small>Pro</small></span></div>
+      <div class="window-actions">
+        <button class="icon-btn" type="button" data-theme-toggle aria-label="Switch to dark theme" title="Switch theme" data-icon="moon"></button>
+        <button class="icon-btn" type="button" data-shortcuts aria-label="Keyboard shortcuts" title="Keyboard shortcuts" data-icon="keyboard"></button>
+      </div>
+    </header>
+
+    <div class="lobby-main">
+      <section class="lobby-art" aria-labelledby="brand-heading">
+        <img class="hero-art" src="assets/marine-meeting-art.webp" alt="">
+        <div class="hero-copy">
+          <h1 id="brand-heading">Make time<br>to connect.</h1>
+          <p>Video meetings with screen sharing, live chat, and room for everyone.</p>
         </div>
+      </section>
+
+      <section class="lobby-content" aria-labelledby="lobby-heading">
+        <div class="lobby-intro">
+          <h2 id="lobby-heading" tabindex="-1">Join a meeting</h2>
+          <p id="lobby-description">Enter a room code or paste an invite link.</p>
+        </div>
+        <div class="segmented" aria-label="Meeting action">
+          <button type="button" id="join-mode" aria-pressed="true"><span data-icon="logIn"></span> Join meeting</button>
+          <button type="button" id="create-mode" aria-pressed="false"><span data-icon="plus"></span> New meeting</button>
+        </div>
+        <form id="lobby-form" class="form-stack">
+          <label for="display-name">Display name</label>
+          <input id="display-name" name="name" autocomplete="nickname" maxlength="40" placeholder="e.g. Alex Morgan" required>
+          <div id="room-field" class="field">
+            <label for="room-input">Room code or invite link</label>
+            <input id="room-input" name="room" autocomplete="off" autocapitalize="characters" maxlength="500" placeholder="e.g. 8QFP2K7A" required>
+          </div>
+          <fieldset class="lobby-options">
+            <legend>Join with</legend>
+            <label><input id="start-mic" type="checkbox" checked><span data-icon="mic"></span> Microphone</label>
+            <label><input id="start-camera" type="checkbox" checked><span data-icon="video"></span> Camera</label>
+          </fieldset>
+          <button id="enter-button" class="primary" type="submit"><span data-icon="logIn"></span><span id="enter-label">Join meeting</span></button>
+        </form>
+        <section id="recent" class="recent" aria-labelledby="recent-heading" hidden>
+          <div class="recent-heading"><h3 id="recent-heading">Recent rooms</h3><button id="clear-recent" class="text-button" type="button">Clear</button></div>
+          <ul id="recent-list"></ul>
+        </section>
+      </section>
     </div>
 
-    <div id="meetingUI" class="meeting-ui">
-        <div class="header">
-            <div class="room-info">
-                <span class="room-label">Meeting code:</span>
-                <span class="room-code" id="displayRoomCode">XXXXXX</span>
-                <button class="icon-btn" id="copyCodeBtn">📋 Copy</button>
-                <button class="icon-btn" id="fullscreenBtn">🖥️ Fullscreen</button>
-            </div>
-            <div class="participant-count" id="participantCount">👥 1 participant</div>
-        </div>
+    <footer class="window-footer"><span><span data-icon="check"></span> No account required</span><button type="button" class="text-button" data-shortcuts>Keyboard shortcuts</button></footer>
+  </main>
 
-        <div class="video-grid" id="videoGrid"></div>
+  <main id="meeting" class="meeting-shell" hidden>
+    <header class="meeting-header">
+      <div class="brand"><img class="brand-icon" src="assets/marine-meetstream-icon.webp" alt=""><span>MeetStream <small>Pro</small></span></div>
+      <div class="room-heading"><h1>Meeting <span id="room-code"></span></h1><span class="meeting-status"><span id="connection-indicator" class="status-dot"></span><span id="connection-label" role="status">Connected</span><span aria-hidden="true">·</span><time id="meeting-timer" aria-label="Time in meeting">00:00</time></span></div>
+      <div class="meeting-actions">
+        <button id="invite-button" type="button" class="secondary"><span data-icon="link"></span><span>Invite</span></button>
+        <button type="button" class="icon-btn" data-theme-toggle aria-label="Switch to dark theme" title="Switch theme" data-icon="moon"></button>
+        <button type="button" class="icon-btn" data-shortcuts aria-label="Keyboard shortcuts" title="Keyboard shortcuts" data-icon="keyboard"></button>
+      </div>
+    </header>
 
-        <div class="controls">
-            <button class="control-btn" id="micBtn" data-tooltip="Microphone">🎤</button>
-            <button class="control-btn" id="camBtn" data-tooltip="Camera">📷</button>
-            <button class="control-btn" id="screenBtn" data-tooltip="Share Screen">🖥️</button>
-            <button class="control-btn leave-btn" id="leaveBtn" data-tooltip="Leave Meeting">🔴</button>
+    <div id="meeting-body" class="meeting-body">
+      <section class="stage" aria-label="Video stage">
+        <div class="stage-bar">
+          <span id="participant-count" class="stage-count"><span data-icon="people"></span><span id="count-label">1 participant</span></span>
+          <button id="enable-audio" type="button" class="secondary" hidden><span data-icon="volume"></span> Enable audio</button>
+          <button id="retry-media" type="button" class="secondary" hidden>Retry media</button>
+          <button id="fullscreen-button" type="button" class="icon-btn" aria-label="Enter full screen" title="Enter full screen (F)" data-icon="fullscreen"></button>
         </div>
+        <div id="video-grid" class="video-grid"></div>
+        <div id="stage-empty" class="stage-empty">
+          <p>You're the only one here.</p>
+          <button id="empty-invite" type="button" class="text-button">Invite someone</button>
+        </div>
+        <div id="reaction-layer" class="reaction-layer" aria-live="polite"></div>
+      </section>
+
+      <aside id="inspector" class="inspector" aria-label="Meeting sidebar" hidden>
+        <div class="inspector-header"><h2>Meeting sidebar</h2><button id="close-inspector" type="button" class="icon-btn" aria-label="Close sidebar" data-icon="close"></button></div>
+        <div class="inspector-tabs" role="tablist" aria-label="Meeting sidebar panels">
+          <button id="people-tab" type="button" role="tab" aria-controls="people-panel" aria-selected="true"><span data-icon="people"></span> People</button>
+          <button id="chat-tab" type="button" role="tab" aria-controls="chat-panel" aria-selected="false" tabindex="-1"><span data-icon="chat"></span> Chat</button>
+          <button id="notes-tab" type="button" role="tab" aria-controls="notes-panel" aria-selected="false" tabindex="-1"><span data-icon="note"></span> Notes</button>
+        </div>
+        <section id="people-panel" class="participants" role="tabpanel" aria-labelledby="people-tab">
+          <ul id="people-list"></ul>
+        </section>
+        <section id="chat-panel" class="chat-panel" role="tabpanel" aria-labelledby="chat-tab" hidden>
+          <div id="chat-messages" class="chat-messages" role="log" aria-label="Meeting chat"><p id="chat-empty" class="panel-empty">No messages yet. Say hello.</p></div>
+          <form id="chat-form" class="chat-form"><label for="chat-input" class="sr-only">Message</label><input id="chat-input" placeholder="Write a message…" maxlength="500" required><button class="icon-btn primary" type="submit" aria-label="Send message" data-icon="send"></button></form>
+        </section>
+        <section id="notes-panel" class="notes-panel" role="tabpanel" aria-labelledby="notes-tab" hidden>
+          <label for="meeting-notes">Private notes</label>
+          <p>Saved on this device for this room.</p>
+          <textarea id="meeting-notes" placeholder="Add an agenda or jot down next steps…" maxlength="12000"></textarea>
+          <button id="download-notes" type="button" class="secondary"><span data-icon="download"></span> Download notes</button>
+        </section>
+      </aside>
     </div>
 
-    <script>
-        // ==================== CONFIGURATION ====================
-        const WS_URL = window.location.protocol === 'https:' ? `wss://${window.location.host}` : `ws://${window.location.host}`;
-        let ws = null;
-        let localStream = null;
-        let screenStream = null;
-        let screenAudioTrack = null;
-        let peerConnections = new Map();
-        let currentRoomId = null;
-        let userId = null;
-        let userName = null;
-        let isScreenSharing = false;
+    <footer class="meeting-footer">
+      <div class="dock" aria-label="Meeting controls">
+        <button id="mic-button" type="button" class="dock-btn" aria-label="Microphone" aria-pressed="false"><span data-icon="mic"></span><span>Mic</span></button>
+        <button id="camera-button" type="button" class="dock-btn" aria-label="Camera" aria-pressed="false"><span data-icon="video"></span><span>Camera</span></button>
+        <button id="share-button" type="button" class="dock-btn" aria-label="Share screen" aria-pressed="false"><span data-icon="screen"></span><span>Share</span></button>
+        <div class="reaction-control">
+          <button id="reaction-button" type="button" class="dock-btn" aria-expanded="false" aria-controls="reactions"><span data-icon="smile"></span><span>React</span></button>
+          <div id="reactions" class="reaction-popover" aria-label="Send a reaction" hidden></div>
+        </div>
+        <button id="hand-button" type="button" class="dock-btn" aria-label="Raise hand" aria-pressed="false"><span data-icon="hand"></span><span>Hand</span></button>
+        <button id="people-button" type="button" class="dock-btn" aria-controls="inspector" aria-pressed="false"><span data-icon="people"></span><span>People</span></button>
+        <button id="chat-button" type="button" class="dock-btn" aria-controls="inspector" aria-pressed="false"><span data-icon="chat"></span><span>Chat</span><span id="chat-unread" class="unread-badge" hidden></span></button>
+        <button id="notes-button" type="button" class="dock-btn" aria-controls="inspector" aria-pressed="false"><span data-icon="note"></span><span>Notes</span></button>
+      </div>
+      <button id="leave-button" type="button" class="leave-button"><span data-icon="phone"></span><span>Leave</span></button>
+    </footer>
+  </main>
 
-        // DOM elements
-        const joinScreen = document.getElementById('joinScreen');
-        const meetingUI = document.getElementById('meetingUI');
-        const videoGrid = document.getElementById('videoGrid');
-        const displayRoomCode = document.getElementById('displayRoomCode');
-        const copyCodeBtn = document.getElementById('copyCodeBtn');
-        const fullscreenBtn = document.getElementById('fullscreenBtn');
-        const micBtn = document.getElementById('micBtn');
-        const camBtn = document.getElementById('camBtn');
-        const screenBtn = document.getElementById('screenBtn');
-        const leaveBtn = document.getElementById('leaveBtn');
-        const joinBtn = document.getElementById('joinBtn');
-        const createBtn = document.getElementById('createBtn');
-        const roomCodeInput = document.getElementById('roomCode');
-        const usernameInput = document.getElementById('usernameInput');
-        const participantCountSpan = document.getElementById('participantCount');
+  <dialog id="invite-dialog" class="dialog" aria-labelledby="invite-title">
+    <form method="dialog" class="dialog-header"><h2 id="invite-title">Invite people</h2><button class="icon-btn" aria-label="Close" data-icon="close"></button></form>
+    <p>Anyone with the link or room code can join.</p>
+    <label for="invite-link">Invite link</label>
+    <input id="invite-link" readonly>
+    <div class="dialog-actions">
+      <button id="copy-code" type="button" class="secondary">Copy code</button>
+      <button id="copy-invite" type="button" class="primary"><span data-icon="copy"></span> Copy link</button>
+    </div>
+  </dialog>
 
-        // TURN servers
-        const configuration = {
-            iceServers: [
-                { urls: 'stun:stun.l.google.com:19302' },
-                { urls: 'stun:stun1.l.google.com:19302' },
-                { urls: 'stun:stun2.l.google.com:19302' },
-                {
-                    urls: 'turn:openrelay.metered.ca:80',
-                    username: 'openrelayproject',
-                    credential: 'openrelayproject'
-                },
-                {
-                    urls: 'turn:openrelay.metered.ca:443',
-                    username: 'openrelayproject',
-                    credential: 'openrelayproject'
-                }
-            ]
-        };
+  <dialog id="share-dialog" class="dialog" aria-labelledby="share-title">
+    <form method="dialog" class="dialog-header"><h2 id="share-title">Share your screen</h2><button class="icon-btn" aria-label="Close" data-icon="close"></button></form>
+    <p>Choose a tab, window, or screen in your browser's screen picker.</p>
+    <label class="checkbox-line"><input id="share-audio" type="checkbox"> Include audio when available</label>
+    <button id="start-share" type="button" class="primary"><span data-icon="screen"></span> Choose what to share</button>
+  </dialog>
 
-        // Focus mode state
-        let isFocusMode = false;
-        let focusedVideoId = null;
+  <dialog id="shortcuts-dialog" class="dialog" aria-labelledby="shortcuts-title">
+    <form method="dialog" class="dialog-header"><h2 id="shortcuts-title">Keyboard shortcuts</h2><button class="icon-btn" aria-label="Close" data-icon="close"></button></form>
+    <dl class="shortcut-list">
+      <div><dt>Toggle microphone</dt><dd><kbd>M</kbd> / <kbd>1</kbd></dd></div>
+      <div><dt>Toggle camera</dt><dd><kbd>V</kbd> / <kbd>2</kbd></dd></div>
+      <div><dt>Share screen with audio</dt><dd><kbd>3</kbd></dd></div>
+      <div><dt>Open screen share options</dt><dd><kbd>S</kbd></dd></div>
+      <div><dt>Raise or lower hand</dt><dd><kbd>H</kbd></dd></div>
+      <div><dt>Open chat</dt><dd><kbd>C</kbd></dd></div>
+      <div><dt>Open private notes</dt><dd><kbd>N</kbd></dd></div>
+      <div><dt>Toggle fullscreen</dt><dd><kbd>F</kbd></dd></div>
+    </dl>
+  </dialog>
 
-        // ==================== UTILITIES ====================
-        function showToast(msg, duration = 3000) {
-            const existing = document.querySelector('.toast');
-            if (existing) existing.remove();
-            const toast = document.createElement('div');
-            toast.className = 'toast';
-            toast.textContent = msg;
-            document.body.appendChild(toast);
-            setTimeout(() => toast.remove(), duration);
-        }
-
-        function generateUserId() { return Math.random().toString(36).substring(2,10) + Date.now().toString(36); }
-        function generateRoomCode() { return Math.random().toString(36).substring(2,10).toUpperCase(); }
-
-        // ==================== VIDEO CARD CONTROLS ====================
-        function addVideoCardControls(card, videoId, videoElement) {
-            const buttonContainer = document.createElement('div');
-            buttonContainer.className = 'video-card-buttons';
-            
-            const focusBtn = document.createElement('button');
-            focusBtn.className = 'video-action-btn';
-            focusBtn.innerHTML = '⭐';
-            focusBtn.title = 'Focus this video';
-            focusBtn.onclick = (e) => {
-                e.stopPropagation();
-                if (isFocusMode && focusedVideoId === videoId) exitFocusMode();
-                else enterFocusMode(videoId);
-            };
-            
-            const fullscreenCardBtn = document.createElement('button');
-            fullscreenCardBtn.className = 'video-action-btn';
-            fullscreenCardBtn.innerHTML = '⛶';
-            fullscreenCardBtn.title = 'Fullscreen';
-            fullscreenCardBtn.onclick = (e) => {
-                e.stopPropagation();
-                if (videoElement.requestFullscreen) {
-                    videoElement.requestFullscreen();
-                } else if (videoElement.webkitRequestFullscreen) {
-                    videoElement.webkitRequestFullscreen();
-                } else {
-                    showToast('Fullscreen not supported');
-                }
-            };
-            
-            buttonContainer.appendChild(focusBtn);
-            buttonContainer.appendChild(fullscreenCardBtn);
-            card.appendChild(buttonContainer);
-        }
-
-        function enterFocusMode(videoId) {
-            if (isFocusMode) exitFocusMode();
-            focusedVideoId = videoId;
-            isFocusMode = true;
-            videoGrid.classList.add('focus-mode');
-            const focusedCard = document.getElementById(videoId);
-            if (focusedCard) focusedCard.classList.add('focused');
-            
-            const exitBtn = document.createElement('button');
-            exitBtn.id = 'exitFocusBtn';
-            exitBtn.className = 'exit-focus-btn';
-            exitBtn.innerHTML = '✖️ Exit Focus';
-            exitBtn.onclick = () => exitFocusMode();
-            meetingUI.appendChild(exitBtn);
-        }
-
-        function exitFocusMode() {
-            if (!isFocusMode) return;
-            isFocusMode = false;
-            videoGrid.classList.remove('focus-mode');
-            const focusedCard = document.getElementById(focusedVideoId);
-            if (focusedCard) focusedCard.classList.remove('focused');
-            const exitBtn = document.getElementById('exitFocusBtn');
-            if (exitBtn) exitBtn.remove();
-            focusedVideoId = null;
-        }
-
-        // ==================== PERSISTENCE ====================
-        function saveMeetingState(roomId, name) {
-            if (roomId && name) {
-                localStorage.setItem('meetstream_room', roomId);
-                localStorage.setItem('meetstream_name', name);
-            } else {
-                localStorage.removeItem('meetstream_room');
-                localStorage.removeItem('meetstream_name');
-            }
-        }
-
-        function loadSavedState() {
-            const savedRoom = localStorage.getItem('meetstream_room');
-            const savedName = localStorage.getItem('meetstream_name');
-            if (savedRoom && savedName) {
-                setTimeout(() => startMeeting(savedRoom, savedName, true), 500);
-            }
-        }
-
-        // ==================== WEBRTC & SIGNALING ====================
-        function connectWebSocket(roomId, userId, userName) {
-            return new Promise((resolve, reject) => {
-                ws = new WebSocket(WS_URL);
-                ws.onopen = () => {
-                    console.log('WebSocket connected');
-                    ws.send(JSON.stringify({ type: 'join-room', roomId, userId, userName }));
-                    resolve();
-                };
-                ws.onmessage = async (event) => {
-                    const data = JSON.parse(event.data);
-                    console.log('Received message:', data.type);
-                    await handleSignalingMessage(data);
-                };
-                ws.onerror = (err) => reject(err);
-                ws.onclose = () => showToast('Disconnected from server');
-            });
-        }
-
-        async function handleSignalingMessage(data) {
-            switch (data.type) {
-                case 'user-joined':
-                    console.log(`User joined: ${data.userName} (${data.userId})`);
-                    await createPeerConnection(data.participantId, data.userId, data.userName, true);
-                    break;
-                case 'existing-participants':
-                    console.log(`Existing participants: ${data.participants.length}`);
-                    for (const p of data.participants) {
-                        await createPeerConnection(p.participantId, p.userId, p.userName, false);
-                    }
-                    updateParticipantCount();
-                    break;
-                case 'offer':
-                    await handleOffer(data);
-                    break;
-                case 'answer':
-                    await handleAnswer(data);
-                    break;
-                case 'ice-candidate':
-                    await handleIceCandidate(data);
-                    break;
-                case 'user-left':
-                    console.log(`User left: ${data.userName}`);
-                    removePeerConnection(data.userId);
-                    updateParticipantCount();
-                    showToast(`${data.userName || 'User'} left`);
-                    break;
-            }
-        }
-
-        async function createPeerConnection(participantId, remoteUserId, remoteUserName, isInitiator) {
-            if (peerConnections.has(remoteUserId)) return;
-            console.log(`Creating peer connection for ${remoteUserName} (initiator: ${isInitiator})`);
-            const pc = new RTCPeerConnection(configuration);
-            peerConnections.set(remoteUserId, { pc, participantId, userName: remoteUserName });
-
-            if (localStream) {
-                localStream.getTracks().forEach(track => {
-                    pc.addTrack(track, localStream);
-                });
-            }
-
-            pc.onicecandidate = (event) => {
-                if (event.candidate) {
-                    ws.send(JSON.stringify({
-                        type: 'ice-candidate',
-                        from: userId,
-                        to: remoteUserId,
-                        data: { candidate: event.candidate }
-                    }));
-                }
-            };
-
-            pc.ontrack = (event) => {
-                console.log(`Received remote track from ${remoteUserName}, kind: ${event.track.kind}`);
-                addRemoteVideo(remoteUserId, remoteUserName, event.streams[0]);
-            };
-
-            pc.onconnectionstatechange = () => {
-                console.log(`Connection state for ${remoteUserName}: ${pc.connectionState}`);
-                if (pc.connectionState === 'connected') {
-                    console.log(`✅ Connected to ${remoteUserName}`);
-                } else if (pc.connectionState === 'failed') {
-                    console.error(`❌ Connection failed to ${remoteUserName}`);
-                    removePeerConnection(remoteUserId);
-                }
-            };
-
-            if (isInitiator) {
-                console.log(`Creating offer for ${remoteUserName}`);
-                const offer = await pc.createOffer();
-                await pc.setLocalDescription(offer);
-                ws.send(JSON.stringify({
-                    type: 'offer',
-                    from: userId,
-                    to: remoteUserId,
-                    data: { sdp: pc.localDescription }
-                }));
-            }
-        }
-
-        async function handleOffer(data) {
-            const peer = peerConnections.get(data.from);
-            if (!peer) return;
-            console.log(`Handling offer from ${data.from}`);
-            await peer.pc.setRemoteDescription(new RTCSessionDescription(data.data.sdp));
-            const answer = await peer.pc.createAnswer();
-            await peer.pc.setLocalDescription(answer);
-            ws.send(JSON.stringify({
-                type: 'answer',
-                from: userId,
-                to: data.from,
-                data: { sdp: peer.pc.localDescription }
-            }));
-        }
-
-        async function handleAnswer(data) {
-            const peer = peerConnections.get(data.from);
-            if (!peer) return;
-            console.log(`Handling answer from ${data.from}`);
-            if (peer.pc.remoteDescription === null) {
-                await peer.pc.setRemoteDescription(new RTCSessionDescription(data.data.sdp));
-            }
-        }
-
-        async function handleIceCandidate(data) {
-            const peer = peerConnections.get(data.from);
-            if (peer && data.data.candidate) {
-                try {
-                    await peer.pc.addIceCandidate(new RTCIceCandidate(data.data.candidate));
-                } catch (err) {
-                    console.error('Error adding ICE candidate:', err);
-                }
-            }
-        }
-
-        function addRemoteVideo(userId, userName, stream) {
-            let card = document.getElementById(`video-${userId}`);
-            if (!card) {
-                console.log(`Creating video element for ${userName}`);
-                card = document.createElement('div');
-                card.className = 'video-card';
-                card.id = `video-${userId}`;
-                const video = document.createElement('video');
-                video.id = `remote-${userId}`;
-                video.autoplay = true;
-                video.playsInline = true;
-                const nameSpan = document.createElement('div');
-                nameSpan.className = 'participant-name';
-                nameSpan.textContent = userName || `User ${userId.slice(0,4)}`;
-                card.appendChild(video);
-                card.appendChild(nameSpan);
-                addVideoCardControls(card, `video-${userId}`, video);
-                videoGrid.appendChild(card);
-            }
-            const videoElem = card.querySelector('video');
-            if (videoElem.srcObject !== stream) {
-                videoElem.srcObject = stream;
-                videoElem.play().catch(e => console.warn('Play failed:', e));
-                console.log(`Attached remote stream for ${userName}`);
-            }
-        }
-
-        function removePeerConnection(userId) {
-            const peer = peerConnections.get(userId);
-            if (peer) {
-                peer.pc.close();
-                peerConnections.delete(userId);
-            }
-            const card = document.getElementById(`video-${userId}`);
-            if (card) card.remove();
-            if (isFocusMode && focusedVideoId === `video-${userId}`) exitFocusMode();
-        }
-
-        // ==================== MEDIA & SCREEN SHARE WITH AUDIO ====================
-        async function setupLocalMedia() {
-            try {
-                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-                console.log('Local stream obtained');
-                const localCard = document.createElement('div');
-                localCard.className = 'video-card';
-                localCard.id = 'local-video';
-                const video = document.createElement('video');
-                video.id = 'localVideo';
-                video.autoplay = true;
-                video.playsInline = true;
-                video.muted = true;
-                video.srcObject = localStream;
-                const nameSpan = document.createElement('div');
-                nameSpan.className = 'participant-name';
-                nameSpan.textContent = `${userName} (You)`;
-                localCard.appendChild(video);
-                localCard.appendChild(nameSpan);
-                addVideoCardControls(localCard, 'local-video', video);
-                videoGrid.insertBefore(localCard, videoGrid.firstChild);
-                micBtn.classList.remove('mic-off');
-                camBtn.classList.remove('cam-off');
-                return true;
-            } catch (err) {
-                console.error('Media error:', err);
-                showToast('Please allow camera and microphone access');
-                return false;
-            }
-        }
-
-        // Show a dialog to ask for audio preference
-        function showScreenShareDialog() {
-            return new Promise((resolve) => {
-                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-                if (isMobile) {
-                    showToast('Screen sharing is not supported on mobile browsers');
-                    resolve(null);
-                    return;
-                }
-                const dialog = document.createElement('div');
-                dialog.className = 'share-dialog';
-                dialog.innerHTML = `
-                    <h3 style="margin:0">Share your screen</h3>
-                    <label>
-                        <input type="checkbox" id="shareAudioCheckbox"> 🎵 Share device audio (movie sound)
-                    </label>
-                    <div style="display:flex; gap:12px; justify-content:center;">
-                        <button class="confirm-btn">Start Sharing</button>
-                        <button class="cancel-btn">Cancel</button>
-                    </div>
-                `;
-                document.body.appendChild(dialog);
-                const confirmBtn = dialog.querySelector('.confirm-btn');
-                const cancelBtn = dialog.querySelector('.cancel-btn');
-                const checkbox = dialog.querySelector('#shareAudioCheckbox');
-                
-                const cleanup = () => dialog.remove();
-                confirmBtn.onclick = () => {
-                    const wantAudio = checkbox.checked;
-                    cleanup();
-                    resolve(wantAudio);
-                };
-                cancelBtn.onclick = () => {
-                    cleanup();
-                    resolve(null);
-                };
-                // close on outside click?
-            });
-        }
-
-        async function startScreenShare() {
-            if (isScreenSharing) {
-                stopScreenShare();
-                return;
-            }
-            const wantAudio = await showScreenShareDialog();
-            if (wantAudio === null) return; // cancelled
-            
-            try {
-                const constraints = { video: true };
-                if (wantAudio) constraints.audio = true;
-                
-                screenStream = await navigator.mediaDevices.getDisplayMedia(constraints);
-                const screenVideoTrack = screenStream.getVideoTracks()[0];
-                const screenAudio = screenStream.getAudioTracks()[0];
-                
-                // Build new outgoing stream: keep mic audio + screen video + (optional) screen audio
-                const newStream = new MediaStream();
-                // Keep existing mic audio (we don't replace microphone, we add screen audio as extra)
-                localStream.getAudioTracks().forEach(track => newStream.addTrack(track));
-                newStream.addTrack(screenVideoTrack);
-                if (screenAudio) {
-                    newStream.addTrack(screenAudio);
-                    screenAudioTrack = screenAudio;
-                    showToast('🎵 Sharing device audio (movie sound)');
-                }
-                
-                // Replace video track in all peer connections, and possibly add screen audio track
-                for (const [_, peer] of peerConnections) {
-                    // Replace video
-                    const videoSender = peer.pc.getSenders().find(s => s.track?.kind === 'video');
-                    if (videoSender) await videoSender.replaceTrack(screenVideoTrack);
-                    else peer.pc.addTrack(screenVideoTrack, newStream);
-                    
-                    // If we have screen audio, replace/add audio track (the mic audio is already present)
-                    // But we want to send both mic and screen audio? Actually we need to replace the audio track
-                    // with the screen audio if we want only screen audio? No, we want both mic and screen audio.
-                    // The user can mute mic separately. So we need to add a second audio track? That's not allowed.
-                    // Better: We'll replace the mic track with a combined stream? That's complex.
-                    // Simpler: For audio, we'll replace the mic track with the screen audio track, and the user can mute
-                    // their mic if they don't want to talk. That's the simplest. So we replace the existing audio track
-                    // with the screen audio track. That way others hear the movie sound, and the user can optionally
-                    // mute their mic (by clicking mic button) if they want only the movie.
-                    // So we'll replace the audio track.
-                    if (screenAudio) {
-                        const audioSender = peer.pc.getSenders().find(s => s.track?.kind === 'audio');
-                        if (audioSender) await audioSender.replaceTrack(screenAudio);
-                        else peer.pc.addTrack(screenAudio, newStream);
-                    }
-                }
-                
-                // Stop old video track (camera) and replace localStream
-                const oldVideo = localStream.getVideoTracks()[0];
-                if (oldVideo) oldVideo.stop();
-                localStream = newStream;
-                
-                // Update local video preview
-                const localVideo = document.getElementById('localVideo');
-                if (localVideo) localVideo.srcObject = localStream;
-                
-                screenVideoTrack.onended = () => stopScreenShare();
-                isScreenSharing = true;
-                screenBtn.classList.add('screen-active');
-                
-                // Show badge on local video card
-                const localCard = document.getElementById('local-video');
-                if (localCard) {
-                    let audioBadge = localCard.querySelector('.screen-audio-badge');
-                    if (!audioBadge && screenAudio) {
-                        audioBadge = document.createElement('div');
-                        audioBadge.className = 'participant-name screen-audio-badge';
-                        audioBadge.style.bottom = '40px';
-                        audioBadge.style.background = '#10b981';
-                        audioBadge.innerHTML = '🎵 Audio';
-                        localCard.appendChild(audioBadge);
-                    }
-                }
-                
-                showToast(wantAudio ? 'Screen sharing started with audio' : 'Screen sharing started');
-            } catch (err) {
-                console.error('Screen share error:', err);
-                showToast('Screen share cancelled or not supported');
-            }
-        }
-
-        async function stopScreenShare() {
-            if (!isScreenSharing) return;
-            
-            // Get fresh camera stream
-            const cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
-            const cameraVideoTrack = cameraStream.getVideoTracks()[0];
-            
-            // Create new stream: camera video + mic audio (keep mic)
-            const newStream = new MediaStream();
-            // Keep original mic audio (we saved the mic track? Actually localStream currently contains the screen audio track, so we need to restore mic.
-            // We'll need to store the mic track when screen sharing starts. Let's store micTrack globally.
-            // For simplicity, we'll just get a fresh mic track.
-            const freshMic = await navigator.mediaDevices.getUserMedia({ audio: true });
-            const micTrack = freshMic.getAudioTracks()[0];
-            newStream.addTrack(micTrack);
-            newStream.addTrack(cameraVideoTrack);
-            
-            // Replace video and audio in all peer connections
-            for (const [_, peer] of peerConnections) {
-                const videoSender = peer.pc.getSenders().find(s => s.track?.kind === 'video');
-                if (videoSender) await videoSender.replaceTrack(cameraVideoTrack);
-                else peer.pc.addTrack(cameraVideoTrack, newStream);
-                
-                const audioSender = peer.pc.getSenders().find(s => s.track?.kind === 'audio');
-                if (audioSender) await audioSender.replaceTrack(micTrack);
-                else peer.pc.addTrack(micTrack, newStream);
-            }
-            
-            // Stop screen share tracks
-            if (screenStream) {
-                screenStream.getTracks().forEach(t => t.stop());
-                screenStream = null;
-            }
-            if (screenAudioTrack) screenAudioTrack = null;
-            
-            localStream = newStream;
-            
-            // Update local preview
-            const localVideo = document.getElementById('localVideo');
-            if (localVideo) localVideo.srcObject = localStream;
-            
-            isScreenSharing = false;
-            screenBtn.classList.remove('screen-active');
-            
-            // Remove audio badge
-            const localCard = document.getElementById('local-video');
-            if (localCard) {
-                const badge = localCard.querySelector('.screen-audio-badge');
-                if (badge) badge.remove();
-            }
-            showToast('Screen sharing stopped');
-        }
-
-        function updateParticipantCount() {
-            const count = peerConnections.size + 1;
-            participantCountSpan.innerHTML = `👥 ${count} participant${count !== 1 ? 's' : ''}`;
-        }
-
-        async function leaveMeeting() {
-            if (localStream) {
-                localStream.getTracks().forEach(t => t.stop());
-                localStream = null;
-            }
-            if (screenStream) {
-                screenStream.getTracks().forEach(t => t.stop());
-                screenStream = null;
-            }
-            for (const [_, peer] of peerConnections) {
-                peer.pc.close();
-            }
-            peerConnections.clear();
-            if (ws) {
-                ws.send(JSON.stringify({ type: 'leave-room', userName }));
-                ws.close();
-            }
-            videoGrid.innerHTML = '';
-            joinScreen.style.display = 'flex';
-            meetingUI.style.display = 'none';
-            saveMeetingState(null, null);
-            exitFocusMode();
-            showToast('You left the meeting');
-        }
-
-        async function startMeeting(roomId, displayName, isAutoJoin = false) {
-            currentRoomId = roomId;
-            userId = generateUserId();
-            userName = displayName;
-            displayRoomCode.textContent = roomId;
-            const mediaOk = await setupLocalMedia();
-            if (!mediaOk) return;
-            await connectWebSocket(roomId, userId, userName);
-            joinScreen.style.display = 'none';
-            meetingUI.style.display = 'flex';
-            if (!isAutoJoin) {
-                saveMeetingState(roomId, displayName);
-                showToast(`Welcome, ${userName}!`);
-            } else {
-                showToast(`Rejoined meeting ${roomId}`);
-            }
-        }
-
-        // ==================== MEDIA CONTROLS (camera/mic) ====================
-        async function toggleCamera() {
-            if (!localStream) return;
-            const videoTrack = localStream.getVideoTracks()[0];
-            if (videoTrack && videoTrack.enabled) {
-                videoTrack.stop();
-                localStream.removeTrack(videoTrack);
-                camBtn.classList.add('cam-off');
-                showToast('Camera off');
-            } else {
-                try {
-                    const newStream = await navigator.mediaDevices.getUserMedia({ video: true });
-                    const newVideoTrack = newStream.getVideoTracks()[0];
-                    const oldVideo = localStream.getVideoTracks()[0];
-                    if (oldVideo) localStream.removeTrack(oldVideo);
-                    localStream.addTrack(newVideoTrack);
-                    const localVideo = document.getElementById('localVideo');
-                    if (localVideo) {
-                        const newCombined = new MediaStream();
-                        localStream.getTracks().forEach(t => newCombined.addTrack(t));
-                        localVideo.srcObject = newCombined;
-                        localStream = newCombined;
-                    }
-                    for (const [_, peer] of peerConnections) {
-                        const sender = peer.pc.getSenders().find(s => s.track?.kind === 'video');
-                        if (sender) {
-                            await sender.replaceTrack(newVideoTrack);
-                        } else {
-                            peer.pc.addTrack(newVideoTrack, localStream);
-                        }
-                    }
-                    camBtn.classList.remove('cam-off');
-                    showToast('Camera on');
-                } catch (err) {
-                    showToast('Could not access camera');
-                }
-            }
-        }
-
-        async function toggleMic() {
-            if (!localStream) return;
-            const audioTrack = localStream.getAudioTracks()[0];
-            if (audioTrack && audioTrack.enabled) {
-                audioTrack.stop();
-                localStream.removeTrack(audioTrack);
-                micBtn.classList.add('mic-off');
-                showToast('Microphone off');
-            } else {
-                try {
-                    const newStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    const newAudioTrack = newStream.getAudioTracks()[0];
-                    const oldAudio = localStream.getAudioTracks()[0];
-                    if (oldAudio) localStream.removeTrack(oldAudio);
-                    localStream.addTrack(newAudioTrack);
-                    for (const [_, peer] of peerConnections) {
-                        const sender = peer.pc.getSenders().find(s => s.track?.kind === 'audio');
-                        if (sender) {
-                            await sender.replaceTrack(newAudioTrack);
-                        } else {
-                            peer.pc.addTrack(newAudioTrack, localStream);
-                        }
-                    }
-                    micBtn.classList.remove('mic-off');
-                    showToast('Microphone on');
-                } catch (err) {
-                    showToast('Could not access microphone');
-                }
-            }
-        }
-
-        async function toggleScreenShareWithAudio() {
-            if (isScreenSharing) {
-                await stopScreenShare();
-            } else {
-                // Start screen share with audio
-                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-                if (isMobile) {
-                    showToast('Screen sharing is not supported on mobile browsers');
-                    return;
-                }
-                try {
-                    const constraints = { video: true, audio: true };
-                    screenStream = await navigator.mediaDevices.getDisplayMedia(constraints);
-                    const screenVideoTrack = screenStream.getVideoTracks()[0];
-                    const screenAudio = screenStream.getAudioTracks()[0];
-                    
-                    // Build new outgoing stream: keep mic audio + screen video + screen audio
-                    const newStream = new MediaStream();
-                    localStream.getAudioTracks().forEach(track => newStream.addTrack(track));
-                    newStream.addTrack(screenVideoTrack);
-                    if (screenAudio) {
-                        newStream.addTrack(screenAudio);
-                        screenAudioTrack = screenAudio;
-                        showToast('🎵 Sharing device audio (movie sound)');
-                    }
-                    
-                    // Replace video track in all peer connections, and replace audio with screen audio
-                    for (const [_, peer] of peerConnections) {
-                        const videoSender = peer.pc.getSenders().find(s => s.track?.kind === 'video');
-                        if (videoSender) await videoSender.replaceTrack(screenVideoTrack);
-                        else peer.pc.addTrack(screenVideoTrack, newStream);
-                        
-                        if (screenAudio) {
-                            const audioSender = peer.pc.getSenders().find(s => s.track?.kind === 'audio');
-                            if (audioSender) await audioSender.replaceTrack(screenAudio);
-                            else peer.pc.addTrack(screenAudio, newStream);
-                        }
-                    }
-                    
-                    const oldVideo = localStream.getVideoTracks()[0];
-                    if (oldVideo) oldVideo.stop();
-                    localStream = newStream;
-                    
-                    const localVideo = document.getElementById('localVideo');
-                    if (localVideo) localVideo.srcObject = localStream;
-                    
-                    screenVideoTrack.onended = () => stopScreenShare();
-                    isScreenSharing = true;
-                    screenBtn.classList.add('screen-active');
-                    
-                    const localCard = document.getElementById('local-video');
-                    if (localCard) {
-                        let audioBadge = localCard.querySelector('.screen-audio-badge');
-                        if (!audioBadge && screenAudio) {
-                            audioBadge = document.createElement('div');
-                            audioBadge.className = 'participant-name screen-audio-badge';
-                            audioBadge.style.bottom = '40px';
-                            audioBadge.style.background = '#10b981';
-                            audioBadge.innerHTML = '🎵 Audio';
-                            localCard.appendChild(audioBadge);
-                        }
-                    }
-                    showToast('Screen sharing started with audio');
-                } catch (err) {
-                    console.error('Screen share error:', err);
-                    showToast('Screen share cancelled or not supported');
-                }
-            }
-        }
-
-        // ==================== EVENT LISTENERS ====================
-        createBtn.onclick = () => {
-            const name = usernameInput.value.trim();
-            if (!name) { showToast('Please enter your name'); usernameInput.focus(); return; }
-            startMeeting(generateRoomCode(), name);
-        };
-        joinBtn.onclick = () => {
-            const name = usernameInput.value.trim();
-            const code = roomCodeInput.value.trim().toUpperCase();
-            if (!name) { showToast('Please enter your name'); usernameInput.focus(); return; }
-            if (!code) { showToast('Please enter a meeting code'); roomCodeInput.focus(); return; }
-            startMeeting(code, name);
-        };
-        copyCodeBtn.onclick = () => {
-            navigator.clipboard.writeText(currentRoomId);
-            showToast('Meeting code copied!');
-        };
-        fullscreenBtn.onclick = () => {
-            if (!document.fullscreenElement) {
-                meetingUI.requestFullscreen();
-                fullscreenBtn.innerHTML = '📴 Exit';
-            } else {
-                document.exitFullscreen();
-                fullscreenBtn.innerHTML = '🖥️ Fullscreen';
-            }
-        };
-        document.addEventListener('fullscreenchange', () => {
-            if (document.fullscreenElement) fullscreenBtn.innerHTML = '📴 Exit';
-            else fullscreenBtn.innerHTML = '🖥️ Fullscreen';
-        });
-        micBtn.onclick = toggleMic;
-        camBtn.onclick = toggleCamera;
-        screenBtn.onclick = () => {
-            if (isScreenSharing) stopScreenShare();
-            else startScreenShare();
-        };
-        leaveBtn.onclick = leaveMeeting;
-        usernameInput.addEventListener('keypress', e => { if (e.key === 'Enter') createBtn.click(); });
-        roomCodeInput.addEventListener('keypress', e => { if (e.key === 'Enter') joinBtn.click(); });
-
-        // Keyboard shortcuts for mic (1) and camera (2)
-        document.addEventListener('keydown', (event) => {
-            // Prevent default only if the key is "1" or "2" and no input/textarea is focused
-            const target = event.target;
-            const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
-            if (!isInput) {
-                switch (event.key) {
-                    case '1':
-                        event.preventDefault();
-                        toggleMic();
-                        break;
-                    case '2':
-                        event.preventDefault();
-                        toggleCamera();
-                        break;
-                    case '3':
-                        event.preventDefault();
-                        toggleScreenShareWithAudio();
-                        break;
-                }
-            }
-        });
-        
-        loadSavedState();
-    </script>
+  <template id="tile-template">
+    <article class="video-tile">
+      <video autoplay playsinline></video>
+      <canvas class="relay-video" aria-hidden="true"></canvas>
+      <div class="avatar" aria-hidden="true"></div>
+      <div class="tile-meta">
+        <span class="tile-name"></span>
+        <span class="tile-muted" aria-label="Microphone muted" title="Microphone muted" data-icon="micOff" hidden></span>
+        <span class="tile-sharing" aria-label="Sharing screen" title="Sharing screen" data-icon="screen" hidden></span>
+        <span class="tile-hand" aria-label="Hand raised" title="Hand raised" data-icon="hand" hidden></span>
+        <span class="tile-connection" hidden></span>
+      </div>
+      <div class="tile-actions">
+        <button class="icon-btn tile-pin" type="button" aria-label="Pin video" title="Pin video" aria-pressed="false" data-icon="pin"></button>
+        <button class="icon-btn tile-fullscreen" type="button" aria-label="Fullscreen video" title="Fullscreen video" data-icon="fullscreen"></button>
+      </div>
+    </article>
+  </template>
+  <div id="toast-stack" class="toast-stack" role="status"></div>
 </body>
 </html>
