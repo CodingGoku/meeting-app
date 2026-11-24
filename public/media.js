@@ -8,8 +8,32 @@ const stopStream = stream => stream?.getTracks().forEach(track => track.stop());
 const ICE_TIMEOUT = 11000;
 const MAX_RESTARTS = 2;
 const BACKGROUND_ICE_TIMEOUT = 25000;
+const MAX_ICE_CANDIDATES = 192;
+const VIDEO_SAMPLE_MS = 1500;
+const VIDEO_STALL_MS = 6000;
 const mediaKinds = ['audio', 'video'];
 const cameraConstraints = { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 30 } };
+
+function transportConnected(pc) {
+    return pc.connectionState === 'connected' ||
+        (!pc.connectionState && ['connected', 'completed'].includes(pc.iceConnectionState));
+}
+
+function iceFragments(description) {
+    const matches = description?.sdp?.matchAll(/^a=ice-ufrag:(\S+)\r?$/gm);
+    return new Set(Array.from(matches || [], match => match[1]));
+}
+
+function candidateMatches(description, candidate) {
+    return Boolean(description?.sdp && (!candidate.usernameFragment ||
+        iceFragments(description).has(candidate.usernameFragment)));
+}
+const microphoneConstraints = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+
+function inputConstraints(device, id) {
+    const defaults = device === 'camera' ? cameraConstraints : microphoneConstraints;
+    return id ? { ...defaults, deviceId: { exact: id } } : defaults;
+}
 
 export class MeetingMedia {
     constructor({ send, onLocal, onRemote, onRemoteRemoved, onStatus = () => {}, notify }) {
@@ -24,6 +48,7 @@ export class MeetingMedia {
         this.iceServers = stunServers;
         this.peers = new Map();
         this.devices = { mic: null, camera: null };
+        this.inputIds = { mic: '', camera: '' };
         this.pendingDevices = new Set();
         this.displayStream = null;
         this.pendingShare = false;
@@ -39,10 +64,14 @@ export class MeetingMedia {
         };
     }
 
-    async prepare({ mic, camera }) {
+    async prepare({ mic, camera, inputIds = {} }) {
+        this.inputIds = { mic: inputIds.mic || '', camera: inputIds.camera || '' };
         if (mic && camera && navigator.mediaDevices?.getUserMedia) {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: cameraConstraints });
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: inputConstraints('mic', this.inputIds.mic),
+                    video: inputConstraints('camera', this.inputIds.camera)
+                });
                 this.setDevice('mic', stream.getAudioTracks()[0]);
                 this.setDevice('camera', stream.getVideoTracks()[0]);
             } catch {
@@ -70,26 +99,53 @@ export class MeetingMedia {
             track.stop();
             return;
         }
-        this.devices[device]?.stop();
+        const previous = this.devices[device];
         this.devices[device] = track;
+        previous?.stop();
         if (device === 'camera' && 'contentHint' in track) track.contentHint = 'motion';
         track.addEventListener('ended', () => {
             if (this.devices[device] !== track) return;
             this.devices[device] = null;
+            this.notify(device === 'mic' ? 'Your microphone is no longer available.' : 'Your camera is no longer available.');
             void this.refresh();
         }, { once: true });
     }
 
-    async openDevice(device) {
+    async openDevice(device, id = this.inputIds[device], useDefaultIfMissing = true) {
         if (!navigator.mediaDevices?.getUserMedia) return false;
         const kind = device === 'mic' ? 'audio' : 'video';
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ [kind]: device === 'camera' ? cameraConstraints : true });
+            const stream = await navigator.mediaDevices.getUserMedia({ [kind]: inputConstraints(device, id) });
             const [track] = stream.getTracks();
+            if (!isLive(track) || this.destroyed) {
+                stopStream(stream);
+                return false;
+            }
             this.setDevice(device, track);
-            return isLive(this.devices[device]);
-        } catch {
+            this.inputIds[device] = id;
+            return true;
+        } catch (error) {
+            if (id && useDefaultIfMissing && !this.destroyed &&
+                (error.name === 'OverconstrainedError' || error.name === 'NotFoundError')) {
+                return this.openDevice(device, '', false);
+            }
             return false;
+        }
+    }
+
+    async setInputDevice(device, id) {
+        if (this.destroyed || this.pendingDevices.has(device)) return false;
+        if (id === this.inputIds[device] || !isLive(this.devices[device])) {
+            this.inputIds[device] = id;
+            return true;
+        }
+        this.pendingDevices.add(device);
+        try {
+            if (!await this.openDevice(device, id, false)) return false;
+            await this.refresh();
+            return !this.destroyed;
+        } finally {
+            this.pendingDevices.delete(device);
         }
     }
 
@@ -230,7 +286,17 @@ export class MeetingMedia {
     }
 
     setIceServers(servers) {
-        this.iceServers = Array.isArray(servers) ? [...stunServers, ...servers] : stunServers;
+        const iceServers = Array.isArray(servers) ? [...stunServers, ...servers] : stunServers;
+        if (JSON.stringify(iceServers) === JSON.stringify(this.iceServers)) return;
+        this.iceServers = iceServers;
+        for (const { pc } of this.peers.values()) {
+            if (pc.signalingState === 'closed' || !pc.getConfiguration) continue;
+            try {
+                pc.setConfiguration({ ...pc.getConfiguration(), iceServers });
+            } catch (error) {
+                console.warn('Could not refresh meeting ICE settings', error);
+            }
+        }
     }
 
     localTracks() {
@@ -303,16 +369,27 @@ export class MeetingMedia {
                 const pc = new RTCPeerConnection({ iceServers: this.iceServers });
                 peer = {
                     pc, participantId, initiate,
-                    stream: new MediaStream(), senders: {},
+                    stream: new MediaStream(), senders: {}, completedLocalIce: new Set(),
                     candidates: [], outgoingCandidates: [],
                     queue: Promise.resolve(), restarts: 0, status: 'connecting'
                 };
                 this.peers.set(userId, peer);
                 this.onStatus(userId, 'connecting');
                 pc.onicecandidate = ({ candidate }) => {
-                    if (!candidate || this.peers.get(userId) !== peer) return;
-                    if (peer.descriptionSent) this.sendCandidate(userId, peer, candidate);
-                    else peer.outgoingCandidates.push(candidate);
+                    if (this.peers.get(userId) !== peer) return;
+                    if (candidate) {
+                        if (candidate.candidate === '' && candidate.usernameFragment) {
+                            peer.completedLocalIce.add(candidate.usernameFragment);
+                        }
+                        this.queueLocalCandidate(userId, peer, candidate);
+                    } else if (pc.iceGatheringState === 'complete') {
+                        // Some browsers send only the gathering-complete event.
+                        for (const fragment of iceFragments(pc.localDescription)) {
+                            if (peer.completedLocalIce.has(fragment)) continue;
+                            peer.completedLocalIce.add(fragment);
+                            this.queueLocalCandidate(userId, peer, { candidate: '', usernameFragment: fragment });
+                        }
+                    }
                 };
                 pc.ontrack = ({ track }) => {
                     const update = () => {
@@ -367,8 +444,8 @@ export class MeetingMedia {
         if (this.peers.get(userId) !== peer) return;
         const { connectionState, iceConnectionState } = peer.pc;
         const probing = peer.keepRecovering && peer.restarts >= MAX_RESTARTS;
-        if (connectionState === 'connected' ||
-            (!connectionState && ['connected', 'completed'].includes(iceConnectionState))) {
+        if (transportConnected(peer.pc)) {
+            if (peer.videoStalled) return;
             clearTimeout(peer.recovery);
             peer.recovery = null;
             peer.restarts = 0;
@@ -388,6 +465,86 @@ export class MeetingMedia {
         if (peer.status === value) return;
         peer.status = value;
         this.onStatus(userId, value);
+    }
+
+    async getPeerStats(userId) {
+        const pc = this.peers.get(userId)?.pc;
+        if (!pc || pc.signalingState === 'closed') return null;
+        try {
+            return await pc.getStats();
+        } catch {
+            return null;
+        }
+    }
+
+    setPeerVideoExpected(userId, expected, sharing = false) {
+        const peer = this.peers.get(userId);
+        if (!peer || (peer.expectVideo === expected && peer.expectScreen === sharing)) return;
+        peer.expectVideo = expected;
+        peer.expectScreen = sharing;
+        peer.videoSample = null;
+        peer.videoRevision = (peer.videoRevision || 0) + 1;
+        if (!expected && peer.videoStalled) {
+            peer.videoStalled = false;
+            this.watchConnection(userId, peer);
+        }
+        this.updateVideoMonitor();
+    }
+
+    updateVideoMonitor() {
+        const active = [...this.peers.values()].some(peer => peer.expectVideo);
+        if (active && !this.videoMonitor) {
+            this.videoMonitor = setInterval(() => {
+                for (const [userId, peer] of this.peers) void this.sampleInboundVideo(userId, peer);
+            }, VIDEO_SAMPLE_MS);
+        } else if (!active && this.videoMonitor) {
+            clearInterval(this.videoMonitor);
+            this.videoMonitor = null;
+        }
+    }
+
+    async sampleInboundVideo(userId, peer) {
+        const { pc } = peer;
+        if (!peer.expectVideo || !transportConnected(pc) ||
+            (typeof document !== 'undefined' && document.visibilityState === 'hidden')) {
+            peer.videoSample = null;
+            return;
+        }
+        if (peer.samplingVideo || !pc.getStats) return;
+        peer.samplingVideo = true;
+        const revision = peer.videoRevision;
+        try {
+            const stats = await pc.getStats();
+            if (this.peers.get(userId) !== peer || revision !== peer.videoRevision || !transportConnected(pc)) return;
+            let decoded = null;
+            stats.forEach(report => {
+                if (report.type === 'inbound-rtp' && (report.kind || report.mediaType) === 'video' &&
+                    Number.isFinite(report.framesDecoded)) {
+                    decoded = (decoded ?? 0) + report.framesDecoded;
+                }
+            });
+            const live = peer.stream.getVideoTracks().some(track => isLive(track) && !track.muted);
+            const now = performance.now();
+            const previous = peer.videoSample;
+            const fresh = !previous || now - previous.at > VIDEO_SAMPLE_MS * 3;
+            // A static shared screen can legitimately produce no new frames.
+            const progressing = Boolean(live && (decoded === null ||
+                (decoded > 0 && (peer.expectScreen || fresh || decoded !== previous.decoded))));
+            const lastProgress = fresh || progressing ? now : previous.lastProgress;
+            peer.videoSample = { at: now, decoded, lastProgress };
+            if (progressing && peer.videoStalled) {
+                peer.videoStalled = false;
+                this.watchConnection(userId, peer);
+            } else if (!peer.videoStalled && now - lastProgress >= VIDEO_STALL_MS) {
+                peer.videoStalled = true;
+                this.setStatus(userId, peer, 'reconnecting');
+                if (peer.initiate) this.scheduleRecovery(userId, peer, 300, true);
+            }
+        } catch {
+            // Statistics are advisory and may be unavailable during a browser transition.
+        } finally {
+            peer.samplingVideo = false;
+        }
     }
 
     keepProbing(userId) {
@@ -429,24 +586,42 @@ export class MeetingMedia {
     }
 
     sendCandidate(userId, peer, candidate) {
-        this.send('ice-candidate', { to: userId, toParticipantId: peer.participantId, data: { candidate } });
+        return this.send('ice-candidate', { to: userId, toParticipantId: peer.participantId, data: { candidate } }) !== false;
+    }
+
+    queueLocalCandidate(userId, peer, candidate) {
+        if (peer.descriptionSent && this.sendCandidate(userId, peer, candidate)) return;
+        if (peer.outgoingCandidates.length >= MAX_ICE_CANDIDATES) peer.outgoingCandidates.shift();
+        peer.outgoingCandidates.push(candidate);
+    }
+
+    flushLocalSignals(userId, peer) {
+        const sdp = peer.pc.localDescription;
+        if (!sdp) return;
+        if (!peer.descriptionSent) {
+            peer.descriptionSent = this.send(sdp.type, {
+                to: userId, toParticipantId: peer.participantId, data: { sdp }
+            }) !== false;
+            if (!peer.descriptionSent) return;
+        }
+        for (const candidate of peer.outgoingCandidates.splice(0)) {
+            if (candidateMatches(sdp, candidate)) this.queueLocalCandidate(userId, peer, candidate);
+        }
+    }
+
+    signalingResumed() {
+        for (const [userId, peer] of this.peers) {
+            void this.queue(userId, peer, () => this.flushLocalSignals(userId, peer));
+        }
     }
 
     async describe(userId, peer, description) {
         peer.descriptionSent = false;
+        const fragments = iceFragments(description);
+        peer.completedLocalIce = new Set([...peer.completedLocalIce].filter(fragment => fragments.has(fragment)));
         await peer.pc.setLocalDescription(description);
         if (this.peers.get(userId) !== peer) return;
-        const { localDescription: sdp } = peer.pc;
-        peer.descriptionSent = this.send(sdp.type, { to: userId, toParticipantId: peer.participantId, data: { sdp } }) !== false;
-        if (peer.descriptionSent) {
-            for (const candidate of peer.outgoingCandidates.splice(0)) this.sendCandidate(userId, peer, candidate);
-        }
-    }
-
-    candidateMatches(pc, candidate) {
-        const sdp = pc.remoteDescription?.sdp;
-        return Boolean(sdp && (!candidate.usernameFragment ||
-            sdp.split(/\r?\n/).includes('a=ice-ufrag:' + candidate.usernameFragment)));
+        this.flushLocalSignals(userId, peer);
     }
 
     async applyCandidate(pc, candidate) {
@@ -487,9 +662,9 @@ export class MeetingMedia {
         return this.queue(from, peer, async () => {
             const { pc } = peer;
             if (type === 'ice-candidate' && data.candidate) {
-                if (this.candidateMatches(pc, data.candidate)) {
+                if (candidateMatches(pc.remoteDescription, data.candidate)) {
                     await this.applyCandidate(pc, data.candidate);
-                } else if (peer.candidates.length < 192) {
+                } else if (peer.candidates.length < MAX_ICE_CANDIDATES) {
                     peer.candidates.push(data.candidate);
                 }
                 return;
@@ -498,7 +673,7 @@ export class MeetingMedia {
             if (type === 'answer' && pc.signalingState !== 'have-local-offer') return;
             await pc.setRemoteDescription(data.sdp);
             for (const candidate of peer.candidates.splice(0)) {
-                if (this.candidateMatches(pc, candidate)) await this.applyCandidate(pc, candidate);
+                if (candidateMatches(pc.remoteDescription, candidate)) await this.applyCandidate(pc, candidate);
             }
             if (type === 'offer') {
                 if (peer.status !== 'connected') this.setStatus(from, peer, 'connecting');
@@ -514,6 +689,7 @@ export class MeetingMedia {
         const peer = this.peers.get(userId);
         if (!peer) return;
         this.peers.delete(userId);
+        this.updateVideoMonitor();
         clearTimeout(peer.recovery);
         peer.pc.ontrack = null;
         peer.pc.onicecandidate = null;

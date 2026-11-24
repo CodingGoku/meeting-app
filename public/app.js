@@ -1,6 +1,7 @@
-import { initIcons, setIcon } from './icons.js?v=7';
-import { MeetingMedia } from './media.js?v=7';
-import { RelayMedia } from './relay-media.js?v=7';
+import { initIcons, setIcon } from './icons.js?v=8';
+import { MeetingMedia } from './media.js?v=8';
+import { RelayMedia } from './relay-media.js?v=8';
+import { mountCallSettings } from './call-settings.js?v=8';
 
 const $ = id => document.getElementById(id);
 const lobby = $('lobby');
@@ -42,6 +43,18 @@ function save(key, value) {
     localStorage.setItem(key, value);
   } catch {
     // The app can still run in this tab with storage disabled or full.
+  }
+}
+
+function preferredInputs() {
+  try {
+    const saved = JSON.parse(load('meetstream_inputs') || '{}');
+    return {
+      mic: typeof saved.mic === 'string' ? saved.mic : '',
+      camera: typeof saved.camera === 'string' ? saved.camera : ''
+    };
+  } catch {
+    return { mic: '', camera: '' };
   }
 }
 
@@ -283,7 +296,10 @@ function setPersonMedia(session, person, state) {
   person.tile.querySelector('.tile-sharing').hidden = !state.sharing;
   person.tile.querySelector('.tile-muted').hidden = state.mic !== false;
   if (person.relayed) updateRelayTile(person);
-  if (!person.local) renderRemote(session, person, person.directStream);
+  if (!person.local) {
+    session.media.setPeerVideoExpected(person.id, state.camera || state.sharing, state.sharing);
+    renderRemote(session, person, person.directStream);
+  }
   syncMeetingActions(session);
 }
 
@@ -384,6 +400,9 @@ function addRemotePerson(session, info, initiate) {
   if (!person.relayRegistered || person.directRecovery) {
     void session.media.addPeer(info.userId, initiate, info.participantId);
   }
+  if (person.media) {
+    session.media.setPeerVideoExpected(person.id, person.media.camera || person.media.sharing, person.media.sharing);
+  }
   if (info.relayed) startMediaRelay(session, info);
   if (person.relayRegistered) publishRelayPreference(session, person);
   else scheduleRelay(session, person, person.directStatus === 'failed' ? 0 : relayDeadlineMs);
@@ -480,6 +499,11 @@ function drawRelayFrame(session, participantId, image) {
     canvas.height = height;
   }
   canvas.getContext('2d', { alpha: false }).drawImage(image, 0, 0);
+  const metrics = person.relayMetrics ||= { frames: 0 };
+  metrics.frames++;
+  metrics.width = width;
+  metrics.height = height;
+  metrics.codec = image.displayWidth ? 'VP8' : 'JPEG';
   person.relayFrame = true;
   updateRelayTile(person);
 }
@@ -690,6 +714,7 @@ function handleMessage(session, data) {
       for (const person of data.participants) {
         addRemotePerson(session, person, resumed && person.shouldOffer === true);
       }
+      session.media.signalingResumed();
       if (session.hasMediaState) send(session, 'media-state', session.mediaState);
       if (session.people.get(session.id).raised) send(session, 'hand-raised', { raised: true });
       updateRoster(session);
@@ -834,7 +859,11 @@ async function enterMeeting(room, name) {
       notify
     });
     void session.relay.enableAudio();
-    const [encodedVideo] = await Promise.all([RelayMedia.supportsEncodedVideo(), session.media.prepare(devices)]);
+    const [encodedVideo] = await Promise.all([
+      RelayMedia.supportsEncodedVideo(),
+      session.media.prepare({ ...devices, inputIds: preferredInputs() })
+    ]);
+    if (active === session) save('meetstream_inputs', JSON.stringify(session.media.inputIds));
     session.encodedVideo = encodedVideo;
     if (active !== session) return;
     save('meetstream_devices', JSON.stringify(devices));
@@ -1014,7 +1043,10 @@ document.querySelectorAll('[data-theme-toggle]').forEach(button => button.addEve
   applyTheme(theme === 'dark' ? 'light' : 'dark');
   save('meetstream_theme', theme);
 }));
-document.querySelectorAll('[data-shortcuts]').forEach(button => button.addEventListener('click', () => $('shortcuts-dialog').showModal()));
+document.querySelectorAll('[data-shortcuts]').forEach(button => button.addEventListener('click', () => {
+  button.closest('dialog[open]')?.close();
+  $('shortcuts-dialog').showModal();
+}));
 $('join-mode').addEventListener('click', () => setMode('join'));
 $('create-mode').addEventListener('click', () => setMode('create'));
 $('clear-recent').addEventListener('click', () => {
@@ -1153,6 +1185,12 @@ window.addEventListener('pageshow', event => {
 });
 
 initIcons(document);
+mountCallSettings({
+  getSession: () => meeting.hidden ? null : active,
+  getInputIds: preferredInputs,
+  saveInputIds: ids => save('meetstream_inputs', JSON.stringify(ids)),
+  notify
+});
 applyTheme(load('meetstream_theme'));
 inputName.value = load('meetstream_name') || '';
 const invitedRoom = normalizeRoom(new URL(location.href).searchParams.get('room') || '');

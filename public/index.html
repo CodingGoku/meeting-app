@@ -7,8 +7,8 @@
   <meta name="description" content="Start or join a video meeting with MeetStream Pro.">
   <title>MeetStream Pro</title>
   <link rel="icon" href="assets/marine-meetstream-icon.webp" type="image/webp">
-  <link rel="stylesheet" href="styles.css?v=7">
-  <script type="module" src="app.js?v=7"></script>
+  <link rel="stylesheet" href="styles.css?v=8">
+  <script type="module" src="app.js?v=8"></script>
 </head>
 <body>
   <main id="lobby" class="lobby-shell">
@@ -17,7 +17,7 @@
       <div class="brand"><img class="brand-icon" src="assets/marine-meetstream-icon.webp" alt=""><span>MeetStream <small>Pro</small></span></div>
       <div class="window-actions">
         <button class="icon-btn" type="button" data-theme-toggle aria-label="Switch to dark theme" title="Switch theme" data-icon="moon"></button>
-        <button class="icon-btn" type="button" data-shortcuts aria-label="Keyboard shortcuts" title="Keyboard shortcuts" data-icon="keyboard"></button>
+        <button class="icon-btn" type="button" data-call-settings aria-label="Meeting settings" title="Meeting settings" data-icon="settings"></button>
       </div>
     </header>
 
@@ -70,7 +70,7 @@
       <div class="meeting-actions">
         <button id="invite-button" type="button" class="secondary"><span data-icon="link"></span><span>Invite</span></button>
         <button type="button" class="icon-btn" data-theme-toggle aria-label="Switch to dark theme" title="Switch theme" data-icon="moon"></button>
-        <button type="button" class="icon-btn" data-shortcuts aria-label="Keyboard shortcuts" title="Keyboard shortcuts" data-icon="keyboard"></button>
+        <button type="button" class="icon-btn" data-call-settings aria-label="Meeting settings" title="Meeting settings" data-icon="settings"></button>
       </div>
     </header>
 
@@ -147,6 +147,26 @@
     <p>Choose a tab, window, or screen in your browser's screen picker.</p>
     <label class="checkbox-line"><input id="share-audio" type="checkbox"> Include audio when available</label>
     <button id="start-share" type="button" class="primary"><span data-icon="screen"></span> Choose what to share</button>
+  </dialog>
+
+  <dialog id="call-settings" class="dialog call-settings" aria-labelledby="call-settings-title">
+    <form method="dialog" class="dialog-header"><h2 id="call-settings-title">Meeting settings</h2><button class="icon-btn" aria-label="Close" data-icon="close"></button></form>
+    <section class="setting-devices" aria-labelledby="device-settings-heading">
+      <h3 id="device-settings-heading">Devices</h3>
+      <label for="select-microphone">Microphone</label>
+      <select id="select-microphone"><option value="">System default</option></select>
+      <label for="select-camera">Camera</label>
+      <select id="select-camera"><option value="">System default</option></select>
+      <p id="device-status"></p>
+    </section>
+    <section id="call-diagnostics" class="call-diagnostics" aria-labelledby="diagnostics-heading" hidden>
+      <h3 id="diagnostics-heading">Connection diagnostics</h3>
+      <p id="diagnostics-status">Reading connection…</p>
+      <dl id="diagnostics-peers"></dl>
+      <button id="copy-diagnostics" class="secondary" type="button" disabled><span data-icon="copy"></span> Copy diagnostics</button>
+      <textarea id="diagnostics-text" aria-label="Connection diagnostics to copy" readonly hidden></textarea>
+    </section>
+    <button type="button" class="text-button" data-shortcuts>Keyboard shortcuts</button>
   </dialog>
 
   <dialog id="shortcuts-dialog" class="dialog" aria-labelledby="shortcuts-title">

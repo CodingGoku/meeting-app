@@ -1,15 +1,14 @@
 const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
-const { v4: uuidv4 } = require('uuid');
 const path = require('path');
-const fs = require('fs');
-const { createHmac } = require('crypto');
+const { createHmac, randomUUID } = require('node:crypto');
 const { createRelayState, requestMediaRelay, forwardRelayPacket, removeRelayPeer } = require('./media-relay');
 
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
+app.disable('x-powered-by');
 
 // Store rooms with participant details
 const rooms = new Map(); // roomId -> Map of participantId -> participant
@@ -17,8 +16,14 @@ const reactions = new Set(['👍', '👏', '❤️', '🎉', '😂', '😮']);
 const activityCooldowns = { 'chat-message': 400, reaction: 650, 'hand-raised': 250 };
 const maxChatLength = 500;
 const maxBufferedBytes = 64 * 1024;
+const maxSignalingBacklog = 512 * 1024;
+const maxSignalingBytes = 64 * 1024;
+const maxPendingConnections = 256;
+const signalJoinTimeoutMs = 12000;
 const reconnectGraceMs = 15000;
 const mediaBindTimeoutMs = 4000;
+const pendingConnections = new Set();
+let draining = false;
 const turnCredentialLifetime = 6 * 60 * 60;
 const turnConfig = readTurnConfig(process.env);
 
@@ -72,8 +77,9 @@ app.use(express.static(publicPath));
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-    res.status(200).json({ 
-        status: 'healthy', 
+    res.set('Cache-Control', 'no-store');
+    res.status(draining ? 503 : 200).json({
+        status: draining ? 'draining' : 'healthy',
         timestamp: new Date().toISOString(),
         activeRooms: rooms.size,
         totalParticipants: Array.from(rooms.values()).reduce((sum, room) => sum + room.size, 0)
@@ -87,31 +93,45 @@ app.get('/test', (req, res) => {
 
 // Stats endpoint
 app.get('/stats', (req, res) => {
-    const stats = {
+    let totalParticipants = 0;
+    let signalingSockets = 0;
+    let mediaSockets = 0;
+    let relayLinks = 0;
+    for (const room of rooms.values()) {
+        totalParticipants += room.size;
+        for (const participant of room.values()) {
+            if (participant.ws.readyState === WebSocket.OPEN) signalingSockets++;
+            if (participant.mediaSocket?.readyState === WebSocket.OPEN) mediaSockets++;
+            relayLinks += participant.relay?.peers.size ?? 0;
+        }
+    }
+    res.set('Cache-Control', 'no-store');
+    res.json({
         uptime: process.uptime(),
         timestamp: new Date().toISOString(),
         activeRooms: rooms.size,
-        participants: Array.from(rooms.entries()).map(([roomId, room]) => ({
-            roomId,
-            participantCount: room.size,
-            participants: Array.from(room.values()).map(p => ({ userId: p.userId, userName: p.userName }))
-        }))
-    };
-    res.json(stats);
+        totalParticipants,
+        signalingSockets,
+        reconnectingParticipants: totalParticipants - signalingSockets,
+        mediaSockets,
+        relayPairs: relayLinks / 2,
+        pendingConnections: pendingConnections.size
+    });
 });
 
-// Create WebSocket server with enhanced configuration
-const wss = new WebSocket.Server({ 
-    server,
-    // Handle connection upgrades properly
-    handleProtocols: (protocols, request) => {
-        return protocols[0] || false;
-    },
-    // Maximum message size (1MB)
-    maxPayload: 1024 * 1024
+const wss = new WebSocket.Server({
+    noServer: true,
+    handleProtocols: () => false,
+    maxPayload: 128 * 1024
 });
 
-console.log('WebSocket server created successfully');
+server.on('upgrade', (request, socket, head) => {
+    if (draining || pendingConnections.size >= maxPendingConnections) {
+        socket.end('HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
+        return;
+    }
+    wss.handleUpgrade(request, socket, head, ws => wss.emit('connection', ws, request));
+});
 
 const heartbeat = setInterval(() => {
     for (const ws of wss.clients) {
@@ -127,21 +147,52 @@ const heartbeat = setInterval(() => {
 heartbeat.unref();
 wss.on('close', () => clearInterval(heartbeat));
 
+function beginHandshake(ws, timeoutMs) {
+    if (pendingConnections.size >= maxPendingConnections) {
+        ws.terminate();
+        return;
+    }
+    pendingConnections.add(ws);
+    ws.handshakeTimer = setTimeout(() => ws.terminate(), timeoutMs);
+    ws.handshakeTimer.unref();
+}
+
+function finishHandshake(ws) {
+    clearTimeout(ws.handshakeTimer);
+    pendingConnections.delete(ws);
+}
+
+function acceptSignalingMessage(ws, message, joined) {
+    const now = Date.now();
+    if (ws.signalWindow === undefined || now - ws.signalWindow >= 1000) {
+        ws.signalWindow = now;
+        ws.signalCount = 0;
+    }
+    const maxMessages = joined ? 240 : 12;
+    if (++ws.signalCount <= maxMessages && message.length <= maxSignalingBytes) return true;
+    ws.close(1008, 'Signaling limit exceeded');
+    return false;
+}
+
 // WebSocket connection handling
 wss.on('connection', (ws, req) => {
     ws.isAlive = true;
     ws.on('pong', () => { ws.isAlive = true; });
+    ws.on('error', error => {
+        console.warn('Meeting WebSocket error:', error.code ?? 'unknown');
+    });
+    ws.once('close', () => finishHandshake(ws));
 
-    if (req.url?.split('?')[0] === '/media') {
+    const isMediaSocket = req.url?.split('?')[0] === '/media';
+    beginHandshake(ws, isMediaSocket ? mediaBindTimeoutMs : signalJoinTimeoutMs);
+    if (isMediaSocket) {
         handleMediaSocket(ws);
         return;
     }
 
-    let participantId = uuidv4();
+    let participantId = randomUUID();
     let currentRoomId = null;
     const connectionTime = new Date();
-
-    console.log(`[${new Date().toISOString()}] New WebSocket connection: ${participantId} from ${req.socket.remoteAddress}`);
 
     // Send initial connection confirmation
     ws.send(JSON.stringify({
@@ -153,21 +204,24 @@ wss.on('connection', (ws, req) => {
     // Handle incoming messages
     ws.on('message', (message, isBinary) => {
         try {
+            if (ws.readyState !== WebSocket.OPEN || draining) return;
             const room = rooms.get(currentRoomId);
             if (currentRoomId && room?.get(participantId)?.ws !== ws) return;
             if (isBinary) {
                 forwardRelayPacket(room, participantId, message);
                 return;
             }
+            if (!acceptSignalingMessage(ws, message, Boolean(currentRoomId))) return;
             const data = JSON.parse(message.toString());
 
-            switch (data.type) {
+            switch (data?.type) {
                 case 'join-room': {
                     if (currentRoomId) break;
                     const joinedId = handleJoinRoom(ws, participantId, data);
                     if (joinedId) {
                         participantId = joinedId;
                         currentRoomId = data.roomId;
+                        finishHandshake(ws);
                     }
                     break;
                 }
@@ -196,8 +250,10 @@ wss.on('connection', (ws, req) => {
                     break;
                     
                 case 'leave-room':
+                    if (!currentRoomId) break;
                     handleLeaveRoom(participantId, currentRoomId);
                     currentRoomId = null;
+                    beginHandshake(ws, signalJoinTimeoutMs);
                     break;
                     
                 case 'ping':
@@ -206,24 +262,21 @@ wss.on('connection', (ws, req) => {
                     break;
                     
                 default:
-                    console.log('Unknown message type:', data.type);
                     ws.send(JSON.stringify({
                         type: 'error',
-                        message: `Unknown message type: ${data.type}`
+                        message: 'Unknown message type'
                     }));
             }
-        } catch (error) {
-            console.error('Error processing message:', error);
-            ws.send(JSON.stringify({
-                type: 'error',
-                message: 'Failed to process message'
-            }));
+        } catch {
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'error', message: 'Failed to process message' }));
+            }
         }
     });
 
     // Handle WebSocket close
-    ws.on('close', (code, reason) => {
-        console.log(`[${new Date().toISOString()}] WebSocket closed: ${participantId} - Code: ${code}, Reason: ${reason || 'No reason provided'}`);
+    ws.on('close', () => {
+        if (draining) return;
         const participant = rooms.get(currentRoomId)?.get(participantId);
         if (participant?.ws !== ws) return;
         if (!participant.connectionKey) {
@@ -238,19 +291,13 @@ wss.on('connection', (ws, req) => {
         participant.disconnectTimer.unref?.();
     });
 
-    // Handle WebSocket errors
-    ws.on('error', (error) => {
-        console.error(`[${new Date().toISOString()}] WebSocket error for ${participantId}:`, error.message);
-    });
 });
 
 function handleMediaSocket(ws) {
     let roomId;
     let participantId;
-    const timeout = setTimeout(() => ws.close(1008, 'Media authentication timeout'), mediaBindTimeoutMs);
-    timeout.unref?.();
-
     ws.on('message', (message, isBinary) => {
+        if (ws.readyState !== WebSocket.OPEN || draining) return;
         if (participantId) {
             const room = rooms.get(roomId);
             if (isBinary && room?.get(participantId)?.mediaSocket === ws) {
@@ -273,7 +320,7 @@ function handleMediaSocket(ws) {
                     member.mediaSocket = ws;
                     roomId = data.roomId;
                     participantId = id;
-                    clearTimeout(timeout);
+                    finishHandshake(ws);
                     replaced?.close(4001, 'Media connection replaced');
                     ws.send(JSON.stringify({ type: 'media-ready' }));
                     return;
@@ -286,11 +333,9 @@ function handleMediaSocket(ws) {
     });
 
     ws.on('close', () => {
-        clearTimeout(timeout);
         const member = rooms.get(roomId)?.get(participantId);
         if (member?.mediaSocket === ws) member.mediaSocket = null;
     });
-    ws.on('error', error => console.error('Media WebSocket error:', error.message));
 }
 
 function handleJoinRoom(ws, participantId, data) {
@@ -315,7 +360,6 @@ function handleJoinRoom(ws, participantId, data) {
         // Create room if it doesn't exist
         if (!rooms.has(roomId)) {
             rooms.set(roomId, new Map());
-            console.log(`[${new Date().toISOString()}] Created new room: ${roomId} by ${userName || userId}`);
         }
         
         const room = rooms.get(roomId);
@@ -378,17 +422,16 @@ function handleJoinRoom(ws, participantId, data) {
             if (pid !== participantId && participant.ws.readyState === WebSocket.OPEN) {
                 try {
                     participant.ws.send(JSON.stringify(newUserInfo));
-                } catch (err) {
-                    console.error('Error notifying participant:', err);
+                } catch {
+                    console.warn('Could not notify a participant of a join.');
                 }
             }
         }
         
-        console.log(`[${new Date().toISOString()}] User ${userName || userId} joined room ${roomId}. Total participants: ${room.size}`);
         return participantId;
         
-    } catch (error) {
-        console.error('Error in handleJoinRoom:', error);
+    } catch {
+        console.warn('Could not join a meeting.');
         if (ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({
                 type: 'error',
@@ -455,8 +498,8 @@ function removeParticipant(room, participantId) {
         if (member.ws.readyState === WebSocket.OPEN) {
             try {
                 member.ws.send(payload);
-            } catch (error) {
-                console.error('Error notifying about leave:', error);
+            } catch {
+                console.warn('Could not notify a participant of a leave.');
             }
         }
     }
@@ -470,20 +513,18 @@ function handleLeaveRoom(participantId, roomId) {
 
         const participant = removeParticipant(room, participantId);
         if (!participant) return;
-        console.log(`[${new Date().toISOString()}] User ${participant.userName || participant.userId} left room ${roomId}. Remaining: ${room.size}`);
         
         // Delete empty rooms after 30 seconds (to allow for reconnections)
         if (room.size === 0) {
             setTimeout(() => {
                 if (rooms.get(roomId) === room && room.size === 0) {
                     rooms.delete(roomId);
-                    console.log(`[${new Date().toISOString()}] Deleted empty room: ${roomId}`);
                 }
-            }, 30000);
+            }, 30000).unref();
         }
         
-    } catch (error) {
-        console.error('Error in handleLeaveRoom:', error);
+    } catch {
+        console.warn('Could not remove a participant.');
     }
 }
 
@@ -528,7 +569,7 @@ function broadcastRoomActivity(participantId, data, roomId) {
 
     sender.lastActivity[type] = now;
     const payload = JSON.stringify(message);
-    const backlogLimit = type === 'media-state' ? 512 * 1024 : maxBufferedBytes;
+    const backlogLimit = type === 'media-state' ? maxSignalingBacklog : maxBufferedBytes;
     for (const participant of room.values()) {
         if (participant.ws.readyState === WebSocket.OPEN && participant.ws.bufferedAmount < backlogLimit) {
             participant.ws.send(payload);
@@ -545,7 +586,8 @@ function forwardToParticipant(participantId, data, roomId) {
         for (const [targetId, participant] of room.entries()) {
             if (participant.userId !== data.to) continue;
             if (data.toParticipantId != null && data.toParticipantId !== targetId) return;
-            if (participant.ws.readyState !== WebSocket.OPEN) break;
+            if (participant.ws.readyState !== WebSocket.OPEN ||
+                participant.ws.bufferedAmount > maxSignalingBacklog) return;
 
             participant.ws.send(JSON.stringify({
                 type: data.type,
@@ -556,94 +598,58 @@ function forwardToParticipant(participantId, data, roomId) {
             }));
             return;
         }
-        console.log(`Target ${data.to} not found or not connected in room ${roomId}`);
-        
-    } catch (error) {
-        console.error('Error in forwardToParticipant:', error);
+    } catch {
+        console.warn('Could not forward a signaling message.');
     }
 }
 
 // Cleanup inactive connections periodically
-setInterval(() => {
+const cleanup = setInterval(() => {
     for (const [roomId, room] of rooms.entries()) {
         for (const [participantId, participant] of room.entries()) {
             if (participant.ws.readyState === WebSocket.CLOSED && !participant.disconnectTimer) {
-                console.log(`Cleaning up inactive participant ${participantId} in room ${roomId}`);
                 removeParticipant(room, participantId);
             }
         }
         
         if (room.size === 0) {
             rooms.delete(roomId);
-            console.log(`Cleaned up empty room: ${roomId}`);
         }
     }
 }, 60000); // Run every minute
+cleanup.unref();
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-    console.log('SIGTERM signal received: closing HTTP server');
-    server.close(() => {
-        console.log('HTTP server closed');
-        // Close all WebSocket connections
-        wss.clients.forEach((client) => {
-            client.close();
-        });
+function shutdown() {
+    if (draining) return;
+    draining = true;
+    clearInterval(heartbeat);
+    clearInterval(cleanup);
+
+    const deadline = setTimeout(() => {
+        for (const ws of wss.clients) ws.terminate();
+        server.closeAllConnections?.();
         process.exit(0);
-    });
-});
+    }, 5000);
+    deadline.unref();
 
-process.on('SIGINT', () => {
-    console.log('SIGINT signal received: closing HTTP server');
-    server.close(() => {
-        console.log('HTTP server closed');
+    let pendingClosures = 2;
+    const closed = () => {
+        if (--pendingClosures > 0) return;
+        clearTimeout(deadline);
         process.exit(0);
-    });
-});
+    };
+    for (const ws of wss.clients) ws.close(1001, 'Server shutting down');
+    wss.close(closed);
+    server.close(closed);
+    server.closeIdleConnections?.();
+}
 
-// Error handling for uncaught exceptions
-process.on('uncaughtException', (error) => {
-    console.error('Uncaught Exception:', error);
-    // Don't crash - keep the server running
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-});
+process.once('SIGTERM', shutdown);
+process.once('SIGINT', shutdown);
 
 // Start server
 server.listen(PORT, '0.0.0.0', () => {
-    console.log(`
-    ╔═══════════════════════════════════════════════════════════════════╗
-    ║                                                                   ║
-    ║   🚀  MEETSTREAM PRO - WebRTC Meeting Server                      ║
-    ║   ═══════════════════════════════════════════════════════════     ║
-    ║                                                                   ║
-    ║   📡  Server Information:                                         ║
-    ║   • Port: ${PORT}                                                      ║
-    ║   • Environment: ${process.env.NODE_ENV || 'development'}                                   ║
-    ║   • Node Version: ${process.version}                                        ║
-    ║                                                                   ║
-    ║   🌐  Access URLs:                                                 ║
-    ║   • Local:    http://localhost:${PORT}                                 ║
-    ║   • WebSocket: ws://localhost:${PORT}                                  ║
-    ║   • Health:   http://localhost:${PORT}/health                          ║
-    ║                                                                   ║
-    ║   📁  Static Files:                                               ║
-    ║   • Public folder: ${publicPath}                                         ║
-    ║   • index.html exists: ${fs.existsSync(path.join(publicPath, 'index.html'))}                       ║
-    ║                                                                   ║
-    ║   💡  Features:                                                   ║
-    ║   • WebRTC Peer-to-Peer connections                               ║
-    ║   • Room-based meetings with codes                                ║
-    ║   • Screen sharing support                                        ║
-    ║   • Participant names and tracking                                ║
-    ║   • Automatic room cleanup                                        ║
-    ║                                                                   ║
-    ║   ✅  Server is ready and waiting for connections!                ║
-    ║                                                                   ║
-    ╚═══════════════════════════════════════════════════════════════════╝
-    `);
+    console.log(`MeetStream listening on port ${server.address().port}`);
 });
 
 // Export for testing purposes
