@@ -25,4 +25,6 @@ If a supported pair can't establish WebRTC or expected video stalls, MeetStream 
 
 When both browsers support VP8 through WebCodecs, relay video uses low-latency encoding with adaptive bitrate and resolution. Screen sharing can reach 1920×1080 on this path. Other browsers use the JPEG relay path, with screen sharing up to 1440 pixels on its longest side.
 
+On browsers with a media track processor, relayed screen sharing reads captured frames directly so it can continue while you work in the shared window. Browsers without that API use the local video preview for the relay.
+
 Public deployments should use HTTPS and forward WebSocket upgrades on both `/` and `/media`. MeetStream prefers the separate `/media` connection for relay video and can use the signaling socket when that route is unavailable. Signaling reconnects within 15 seconds preserve the participant's membership and existing media connections.

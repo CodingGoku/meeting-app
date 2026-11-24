@@ -1,7 +1,7 @@
-import { initIcons, setIcon } from './icons.js?v=8';
-import { MeetingMedia } from './media.js?v=8';
-import { RelayMedia } from './relay-media.js?v=8';
-import { mountCallSettings } from './call-settings.js?v=8';
+import { initIcons, setIcon } from './icons.js?v=9';
+import { MeetingMedia } from './media.js?v=9';
+import { RelayMedia } from './relay-media.js?v=9';
+import { mountCallSettings } from './call-settings.js?v=9';
 
 const $ = id => document.getElementById(id);
 const lobby = $('lobby');
@@ -610,7 +610,8 @@ function renderMedia(session, stream, state) {
   person.tile.classList.toggle('is-mirrored', state.camera && !state.sharing);
   showStream(person, stream, state.camera || state.sharing);
   session.relay?.setLocal(state.camera || state.sharing ? person.video : null,
-    session.media.outbound.getAudioTracks()[0] || null, state.sharing);
+    session.media.outbound.getAudioTracks()[0] || null, state.sharing,
+    state.sharing ? stream?.getVideoTracks()[0] : null);
   const mic = $('mic-button');
   const camera = $('camera-button');
   mic.classList.toggle('is-off', !state.mic);

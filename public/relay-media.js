@@ -1,3 +1,5 @@
+import { openDisplayFrames } from './screen-frame-source.js?v=9';
+
 const videoKind = 1;
 const audioKind = 2;
 const encodedVideoKind = 3;
@@ -77,14 +79,17 @@ export class RelayMedia {
         this.encodedGoodFrames = 0;
         this.frameSequence = 0;
         this.lastJpegAt = -Infinity;
+        this.lastVideoAt = -Infinity;
     }
 
-    setLocal(videoElement, audioTrack, sharing) {
+    setLocal(videoElement, audioTrack, sharing, displayTrack = null) {
         if (this.destroyed) return;
-        if (this.video !== videoElement || this.sharing !== sharing) {
+        if (this.video !== videoElement || this.sharing !== sharing || this.displayTrack !== displayTrack) {
             this.closeEncoder();
             this.encodedProfile = 0;
             this.encodedGoodFrames = 0;
+            this.lastVideoAt = -Infinity;
+            this.lastJpegAt = -Infinity;
         }
         this.video = videoElement;
         if (this.sharing !== sharing) {
@@ -92,7 +97,9 @@ export class RelayMedia {
             this.goodFrames = 0;
         }
         this.sharing = sharing;
+        this.displayTrack = displayTrack;
         this.frameVersion++;
+        this.updateDisplayFrames();
         if (this.audioTrack === audioTrack) return;
         this.audioTrack = audioTrack;
         this.stopAudioCapture();
@@ -110,6 +117,8 @@ export class RelayMedia {
             this.captureFrames();
             this.startAudioCapture();
         }
+        this.updateDisplayFrames();
+        if (this.lastDisplayFrame) this.captureFrames(this.lastDisplayFrame);
         this.refreshAudioState();
     }
 
@@ -123,6 +132,7 @@ export class RelayMedia {
             this.frameVersion++;
         }
         this.releaseIdleCapture();
+        this.updateDisplayFrames();
         this.refreshAudioState();
     }
 
@@ -136,6 +146,8 @@ export class RelayMedia {
         } else {
             this.releaseIdleCapture();
         }
+        this.updateDisplayFrames();
+        if (enabled && this.lastDisplayFrame) this.captureFrames(this.lastDisplayFrame);
         this.refreshAudioState();
     }
 
@@ -192,6 +204,7 @@ export class RelayMedia {
                 peer.sendEncoded = false;
                 this.releaseIdleCapture();
             }
+            if (peer.sending && this.lastDisplayFrame) this.captureFrames(this.lastDisplayFrame);
             return;
         }
         if (!peer.receiving) return;
@@ -205,14 +218,51 @@ export class RelayMedia {
         if (kind === audioKind && bytes.byteLength === audioPacketBytes) this.renderAudio(peer, bytes);
     }
 
-    captureFrames() {
+    updateDisplayFrames() {
+        const track = this.sharing && this.displayTrack?.readyState === 'live' &&
+            [...this.peers.values()].some(peer => peer.sending) ? this.displayTrack : null;
+        if (this.displaySource?.track === track) return;
+        this.closeDisplayFrames();
+        if (!track) return;
+
+        const source = { track };
+        this.displaySource = source;
+        source.stop = openDisplayFrames(track, frame => {
+            if (this.displaySource !== source) return;
+            this.lastDisplayFrame?.close();
+            this.lastDisplayFrame = frame.clone();
+            this.lastDisplayFrameAt = performance.now();
+            this.captureFrames(frame);
+        }, () => {
+            if (this.displaySource !== source) return;
+            this.lastDisplayFrame?.close();
+            this.lastDisplayFrame = null;
+        });
+    }
+
+    closeDisplayFrames() {
+        const source = this.displaySource;
+        this.displaySource = null;
+        source?.stop?.();
+        this.lastDisplayFrame?.close();
+        this.lastDisplayFrame = null;
+    }
+
+    captureFrames(frame = null) {
         const peers = [...this.peers.values()];
         const now = performance.now();
-        if (!this.codecFailed && peers.some(peer => peer.sending && peer.sendEncoded)) this.encodeVideo(now);
+        // Keep one screen frame for static content and for peers that start receiving mid-share.
+        if (!frame && this.lastDisplayFrame && now - this.lastDisplayFrameAt < 300) return;
+        const source = frame || this.lastDisplayFrame;
+        const videoGap = 1000 / videoFrameRate - 2;
+        if (now - this.lastVideoAt >= videoGap && !this.codecFailed && peers.some(peer => peer.sending && peer.sendEncoded)) {
+            this.lastVideoAt = now;
+            this.encodeVideo(now, source);
+        }
         if (now - this.lastJpegAt >= videoInterval &&
             peers.some(peer => peer.sending && (!peer.sendEncoded || this.codecFailed))) {
             this.lastJpegAt = now;
-            void this.captureVideo();
+            void this.captureVideo(source);
         }
     }
 
@@ -248,17 +298,19 @@ export class RelayMedia {
         return blocked;
     }
 
-    encodeVideo(now) {
+    encodeVideo(now, displayFrame) {
         const video = this.video;
-        if (!video || video.readyState < 2 || !video.videoWidth || !video.videoHeight || this.encoderBacklogged(now)) return;
-        if (video.srcObject && !video.srcObject.getVideoTracks().some(track => track.readyState === 'live')) return;
+        const sourceWidth = displayFrame ? displayFrame.displayWidth : video?.videoWidth;
+        const sourceHeight = displayFrame ? displayFrame.displayHeight : video?.videoHeight;
+        if (!sourceWidth || !sourceHeight || (!displayFrame && video.readyState < 2) || this.encoderBacklogged(now)) return;
+        if (!displayFrame && video.srcObject && !video.srcObject.getVideoTracks().some(track => track.readyState === 'live')) return;
 
         const profiles = this.sharing ? encodedScreenProfiles : encodedCameraProfiles;
         const [edge, bitrate] = profiles[this.encodedProfile];
-        const scale = Math.min(1, edge / Math.max(video.videoWidth, video.videoHeight),
-            Math.sqrt(maxEncodedPixels / (video.videoWidth * video.videoHeight)));
-        const width = Math.max(2, 2 * Math.floor(video.videoWidth * scale / 2));
-        const height = Math.max(2, 2 * Math.floor(video.videoHeight * scale / 2));
+        const scale = Math.min(1, edge / Math.max(sourceWidth, sourceHeight),
+            Math.sqrt(maxEncodedPixels / (sourceWidth * sourceHeight)));
+        const width = Math.max(2, 2 * Math.floor(sourceWidth * scale / 2));
+        const height = Math.max(2, 2 * Math.floor(sourceHeight * scale / 2));
         const sending = [...this.peers.values()].filter(peer => peer.sending && peer.sendEncoded);
         const budget = Math.min(bitrate, Math.round(18_000_000 / sending.length));
         try {
@@ -270,7 +322,7 @@ export class RelayMedia {
                 (elapsed >= 280 && sending.some(peer => peer.needsKeyframe));
             if (keyFrame) this.lastKeyframeAt = now;
             // The encoder scales to its configured dimensions without a canvas redraw.
-            const frame = new VideoFrame(video, { timestamp: Math.round(now * 1000) });
+            const frame = new VideoFrame(displayFrame || video, { timestamp: Math.round(now * 1000) });
             try {
                 this.encoder.encode(frame, { keyFrame });
             } finally {
@@ -454,11 +506,14 @@ export class RelayMedia {
         this.requestKeyframe(participantId, peer);
     }
 
-    async captureVideo() {
+    async captureVideo(displayFrame) {
         const video = this.video;
-        if (this.capturingFrame || !this.peers.size || !video || video.readyState < 2 || !video.videoWidth || !video.videoHeight) return;
-        if (video.srcObject && !video.srcObject.getVideoTracks().some(track => track.readyState === 'live')) return;
+        const sourceWidth = displayFrame ? displayFrame.displayWidth : video?.videoWidth;
+        const sourceHeight = displayFrame ? displayFrame.displayHeight : video?.videoHeight;
+        if (this.capturingFrame || !this.peers.size || !sourceWidth || !sourceHeight || (!displayFrame && video.readyState < 2)) return;
+        if (!displayFrame && video.srcObject && !video.srcObject.getVideoTracks().some(track => track.readyState === 'live')) return;
 
+        const captured = displayFrame?.clone();
         this.canvas ||= document.createElement('canvas');
         const canvas = this.canvas;
         const profiles = this.sharing ? screenProfiles : cameraProfiles;
@@ -468,12 +523,12 @@ export class RelayMedia {
         try {
             for (let attempt = 0; attempt < 2 && currentFrame(); attempt++) {
                 const [edge, quality] = profiles[this.videoProfile];
-                const scale = Math.min(1, edge / Math.max(video.videoWidth, video.videoHeight));
-                const width = Math.max(1, Math.round(video.videoWidth * scale));
-                const height = Math.max(1, Math.round(video.videoHeight * scale));
+                const scale = Math.min(1, edge / Math.max(sourceWidth, sourceHeight));
+                const width = Math.max(1, Math.round(sourceWidth * scale));
+                const height = Math.max(1, Math.round(sourceHeight * scale));
                 if (canvas.width !== width) canvas.width = width;
                 if (canvas.height !== height) canvas.height = height;
-                canvas.getContext('2d').drawImage(video, 0, 0, width, height);
+                canvas.getContext('2d').drawImage(captured || video, 0, 0, width, height);
                 const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality));
                 if (!blob || !currentFrame()) return;
                 if (blob.size > maxVideoBytes) {
@@ -496,6 +551,7 @@ export class RelayMedia {
         } catch {
             this.report('video', 'This browser could not capture video for the meeting relay.');
         } finally {
+            captured?.close();
             this.capturingFrame = false;
         }
     }
@@ -638,6 +694,7 @@ export class RelayMedia {
     destroy() {
         if (this.destroyed) return;
         this.destroyed = true;
+        this.closeDisplayFrames();
         for (const participantId of this.peers.keys()) this.removePeer(participantId);
         this.stopAudioCapture();
         if (this.audioContext) {

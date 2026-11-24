@@ -2,84 +2,101 @@
     color-scheme: dark;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     font-synthesis: none;
-    --background: #081724;
-    --surface: #0d2233;
-    --surface-raised: #152e40;
-    --surface-soft: #143249;
-    --surface-hover: #21485d;
-    --stage: #0b2334;
-    --line: #c2eaf327;
-    --line-strong: #c2eaf346;
-    --text: #eefaff;
-    --muted: #c0d8e2;
-    --quiet: #aac8d6;
-    --accent: #a3eaff;
-    --accent-wash: #5ac9f125;
-    --focus: #a0ecff;
-    --danger: #ffabb8;
-    --danger-wash: #f76f8a1f;
-    --green: #66e0ae;
-    --wallpaper: radial-gradient(ellipse 68% 70% at 6% -2%, #126a8c 0%, transparent 72%),
-        radial-gradient(ellipse 63% 83% at 99% 101%, #0a4c7b 0%, transparent 74%),
-        radial-gradient(ellipse 53% 38% at 84% 13%, #10455c 0%, transparent 72%),
-        linear-gradient(152deg, #0f344d 0%, #081725 58%, #09263c 100%);
-    --glass-window: #102b3abb;
-    --glass-chrome: #2447598a;
-    --glass-panel: #174056b8;
-    --glass-stage: #0a2435c5;
-    --glass-recess: #0a1e31bb;
-    --glass-edge: #c4f4ff56;
-    --glass-sheen: #e0f9ff52;
-    --glass-lowlight: #06203470;
-    --glass-coat: radial-gradient(ellipse at 3% 0%, #c7faff1c, transparent 60%),
-        linear-gradient(145deg, #b2edff10 0%, transparent 51%, #329ad713 100%);
-    --control-coat: linear-gradient(155deg, #eaffff2e, transparent 62%, #48c3f615);
-    --window-shadow: 0 30px 92px #02101f7a, 0 8px 22px #01101e57;
-    --panel-shadow: 0 12px 32px #030e2542, inset 0 1px 1px var(--glass-sheen), inset 0 -1px 1px var(--glass-lowlight);
-    --tile-frame: #6cc9eb45;
-    --tile-shade: radial-gradient(ellipse at 30% 20%, #164963, #103349 55%, #0b2235 100%);
-    --avatar-shadow: #07172057;
+    --background: #101a2a;
+    --surface: #162539;
+    --surface-raised: #1d2e45;
+    --surface-soft: #243952;
+    --surface-hover: #304a65;
+    --stage: #15263b;
+    --line: #c5def728;
+    --line-strong: #c5def74d;
+    --text: #f5f9ff;
+    --muted: #cedbea;
+    --quiet: #b1c3d8;
+    --accent: #a8ddff;
+    --accent-wash: #78bafb2d;
+    --focus: #94d9ff;
+    --danger: #ffc0c9;
+    --danger-wash: #ef6c8128;
+    --inactive-wash: #d5e4fa1b;
+    --green: #77e0ae;
+    --pending: #ffc568;
+    --wallpaper: radial-gradient(ellipse 70% 72% at 4% -6%, #285783 0%, transparent 73%),
+        radial-gradient(ellipse 65% 84% at 101% 103%, #174c85 0%, transparent 76%),
+        radial-gradient(ellipse 53% 40% at 85% 9%, #2c596a 0%, transparent 74%),
+        linear-gradient(152deg, #1e3857 0%, #101a2b 59%, #132b47 100%);
+    --glass-window: #182a40c7;
+    --glass-chrome: #293e588f;
+    --glass-panel: #233a52bb;
+    --glass-stage: #16273ac2;
+    --glass-recess: #132337b8;
+    --glass-edge: #c7e4ff50;
+    --glass-sheen: #e8f4ff50;
+    --glass-lowlight: #09182579;
+    --glass-coat: radial-gradient(ellipse at 3% 0%, #d0eaff24, transparent 65%),
+        linear-gradient(145deg, #c8e6ff12 0%, transparent 52%, #75aaff1c 100%);
+    --control-coat: linear-gradient(155deg, #eaf6ff32, transparent 64%, #73b9f016);
+    --window-shadow: 0 30px 92px #080f217d, 0 8px 22px #090f2154;
+    --panel-shadow: 0 12px 32px #080f2545, inset 0 1px 1px var(--glass-sheen), inset 0 -1px 1px var(--glass-lowlight);
+    --tile-frame: #a2cdf34a;
+    --tile-shade: radial-gradient(ellipse at 26% 15%, #294760, #1c344e 56%, #17293f 100%);
+    --avatar-shadow: #0c172759;
+    --primary-fill: linear-gradient(180deg, #e4f3ff 0%, #b2deff 38%, #84baf0 100%);
+    --primary-ink: #102c4a;
+    --primary-edge: #b6dcff;
+    --leave-fill: linear-gradient(148deg, #f9b9bf31 0%, #77344654 72%, #642b3c62);
+    --leave-hover: #743646;
+    --lift-shadow: 0 4px 12px #07142550, inset 0 1px 0 var(--glass-sheen);
+    --ease-interaction: cubic-bezier(.2,.8,.24,1);
+    --ease-reveal: cubic-bezier(.2,.7,.24,1);
 }
 
 [data-theme="light"] {
     color-scheme: light;
-    --background: #d6edf8;
-    --surface: #f2fbff;
+    --background: #e3edf8;
+    --surface: #f5f9fe;
     --surface-raised: #ffffff;
-    --surface-soft: #e1f3fc;
-    --surface-hover: #d1edfa;
-    --stage: #e5f4fc;
-    --line: #124f6b27;
-    --line-strong: #124f6b43;
-    --text: #102f40;
-    --muted: #345767;
-    --quiet: #476779;
-    --accent: #00587a;
-    --accent-wash: #238cba20;
-    --focus: #006d99;
-    --danger: #a32d4c;
-    --danger-wash: #ca3b6720;
-    --green: #087b56;
-    --wallpaper: radial-gradient(ellipse 65% 58% at 2% 2%, #fcffff 0%, transparent 77%),
-        radial-gradient(ellipse 65% 64% at 97% 3%, #b8fcf9 0%, transparent 76%),
-        radial-gradient(ellipse 65% 84% at 105% 100%, #68a6de 0%, transparent 78%),
-        linear-gradient(153deg, #e3faff 0%, #bedfeb 60%, #a4cef3 100%);
-    --glass-window: #e8f8ffd9;
-    --glass-chrome: #f2fcffc4;
-    --glass-panel: #f1fbffc5;
-    --glass-stage: #e5f6ffa6;
-    --glass-recess: #f5fdffab;
+    --surface-soft: #ebf3fc;
+    --surface-hover: #dceafd;
+    --stage: #edf5fc;
+    --line: #233f6527;
+    --line-strong: #233f6547;
+    --text: #152a42;
+    --muted: #3d556d;
+    --quiet: #4c6178;
+    --accent: #06568b;
+    --accent-wash: #2078c91e;
+    --focus: #0a68b1;
+    --danger: #9e2540;
+    --danger-wash: #bc3b571d;
+    --inactive-wash: #254a7516;
+    --green: #157752;
+    --pending: #92540b;
+    --wallpaper: radial-gradient(ellipse 70% 75% at 1% 1%, #fcfeff 0%, transparent 78%),
+        radial-gradient(ellipse 60% 76% at 97% 1%, #c7eaf4 0%, transparent 77%),
+        radial-gradient(ellipse 65% 92% at 105% 100%, #8bb0e5 0%, transparent 78%),
+        linear-gradient(153deg, #e9f3fd 0%, #cedfeb 62%, #b2d0f2 100%);
+    --glass-window: #f0f7fec9;
+    --glass-chrome: #f8fbffd1;
+    --glass-panel: #f5faffcb;
+    --glass-stage: #edf6ffc0;
+    --glass-recess: #f6faffbe;
     --glass-edge: #ffffffed;
     --glass-sheen: #ffffffef;
-    --glass-lowlight: #4889b641;
-    --glass-coat: radial-gradient(ellipse at 4% 0%, #ffffffa8, transparent 62%),
-        linear-gradient(145deg, #ffffff63 0%, transparent 48%, #a2ddff4a 100%);
-    --control-coat: linear-gradient(157deg, #ffffffbd, transparent 63%, #82cdeb28);
-    --window-shadow: 0 34px 86px #22587839, 0 6px 20px #37799f29;
-    --panel-shadow: 0 12px 32px #24648c24, inset 0 1px 1px var(--glass-sheen), inset 0 -1px 1px var(--glass-lowlight);
+    --glass-lowlight: #4778a43b;
+    --glass-coat: radial-gradient(ellipse at 4% 0%, #ffffffa9, transparent 65%),
+        linear-gradient(145deg, #ffffff5c 0%, transparent 52%, #b1d6ff3e 100%);
+    --control-coat: linear-gradient(157deg, #ffffffc4, transparent 65%, #b4d6fb3a);
+    --window-shadow: 0 34px 85px #234b7935, 0 6px 19px #2f5d8529;
+    --panel-shadow: 0 12px 30px #1f538c22, inset 0 1px 1px var(--glass-sheen), inset 0 -1px 1px var(--glass-lowlight);
     --tile-frame: #ffffffdf;
-    --tile-shade: radial-gradient(ellipse at 27% 12%, #f0fcff, #d4edfc 56%, #b5d7ef 100%);
-    --avatar-shadow: #28628e45;
+    --tile-shade: radial-gradient(ellipse at 27% 12%, #f7fbff, #e5effb 56%, #c4d8ef 100%);
+    --avatar-shadow: #345b8942;
+    --primary-fill: linear-gradient(180deg, #fcfeff 0%, #c3e2ff 35%, #96c4f4 100%);
+    --primary-edge: #7aa9dcac;
+    --leave-fill: linear-gradient(148deg, #fff7f9 0%, #f6d9e1 70%, #f2cbd5);
+    --leave-hover: #f7d5df;
+    --lift-shadow: 0 4px 11px #2d5f8a36, inset 0 1px 0 var(--glass-sheen);
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -130,7 +147,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
     border-radius: 27px;
     background: var(--surface);
     box-shadow: var(--window-shadow);
-    animation: window-in 500ms cubic-bezier(.2,.7,.25,1) both;
+    animation: window-in 350ms var(--ease-reveal) both;
 }
 
 .lobby-shell::after {
@@ -235,7 +252,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
     font-size: .875rem;
     font-weight: 620;
     text-decoration: none;
-    transition: background 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+    transition: border-color 170ms ease, transform 180ms var(--ease-interaction),
+        box-shadow 180ms var(--ease-interaction), filter 170ms ease;
 }
 
 .icon-btn { min-width: 40px; padding-inline: 9px; }
@@ -359,7 +377,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
     color: var(--muted);
     font-size: .88rem;
     font-weight: 650;
-    transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+    transition: border-color 160ms ease, box-shadow 160ms var(--ease-interaction);
 }
 
 .segmented button:hover, .inspector-tabs button:hover { color: var(--text); }
@@ -388,7 +406,7 @@ input:not([type="checkbox"]):not([type="radio"]), textarea {
     color: var(--text);
     font-size: 1rem;
     font-weight: 450;
-    transition: border-color 160ms ease, background 160ms ease;
+    transition: border-color 160ms ease;
 }
 
 input:not([type="checkbox"]):not([type="radio"]):focus, textarea:focus { border-color: var(--focus); }
@@ -408,7 +426,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
     background: var(--surface-soft);
     color: var(--muted);
     cursor: pointer;
-    transition: background 160ms ease, color 160ms ease;
+    transition: border-color 160ms ease;
 }
 
 .lobby-options label:hover { background: var(--surface-hover); }
@@ -423,16 +441,16 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
 
 .primary {
     min-height: 46px;
-    border-color: #76c7ecb8;
-    background: linear-gradient(180deg, #f3fdff 0%, #a6e9fa 20%, #70cbed 60%, #71bce9 100%);
-    box-shadow: inset 0 1px 1px #fffc, inset 0 -1px 1px #18557c3d, 0 7px 18px #2388b63d;
-    color: #07374f;
+    border-color: var(--primary-edge);
+    background: var(--primary-fill);
+    box-shadow: inset 0 1px 1px #ffffffd4, inset 0 -1px 1px #2458943e, 0 6px 17px #315e9e32;
+    color: var(--primary-ink);
     font-weight: 750;
 }
 
 .primary:hover {
-    background: linear-gradient(180deg, #ffffff 0%, #b7effe 22%, #83d7f4 60%, #7fc7ef 100%);
-    box-shadow: inset 0 1px 1px #ffff, inset 0 -1px 1px #18557c3d, 0 8px 24px #2186ba5e;
+    filter: brightness(1.035);
+    box-shadow: inset 0 1px 1px #fff, inset 0 -1px 1px #2458943e, 0 7px 22px #315e9e50;
 }
 
 .recent { display: grid; gap: 6px; margin-top: 14px; }
@@ -511,7 +529,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
 #connection-label { overflow: hidden; text-overflow: ellipsis; }
 .meeting-status time { font-variant-numeric: tabular-nums; }
 .status-dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--green); }
-.status-dot.is-waiting { background: var(--danger); }
+.status-dot.is-waiting { background: var(--pending); }
 
 .meeting-body {
     display: flex;
@@ -569,7 +587,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
     background: var(--tile-shade);
     box-shadow: inset 0 1px 0 var(--glass-sheen);
     color: #fff;
-    animation: tile-in 235ms ease-out both;
+    animation: tile-in 210ms var(--ease-reveal) both;
 }
 
 .video-tile:only-child { width: min(100%, 850px); max-height: 58vh; justify-self: center; }
@@ -679,7 +697,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
     border: 1px solid var(--line);
     border-radius: 19px;
     background: var(--surface);
-    animation: inspector-in 200ms ease-out both;
+    animation: inspector-in 215ms var(--ease-reveal) both;
 }
 
 .inspector h2, .inspector h3 { margin: 0; font-size: 1rem; }
@@ -751,6 +769,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
     justify-content: center;
     gap: 10px;
     padding: 0 12px max(12px, env(safe-area-inset-bottom));
+    animation: dock-in 270ms var(--ease-reveal) both;
 }
 
 .dock {
@@ -763,7 +782,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
     gap: 3px;
     padding: 6px;
     border: 1px solid var(--line-strong);
-    border-radius: 17px;
+    border-radius: 19px;
     background: var(--surface-raised);
     box-shadow: 0 10px 30px #0003, inset 0 1px 0 var(--line);
 }
@@ -784,19 +803,33 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
 
 .dock-btn:hover { color: var(--text); }
 .dock-btn .icon { width: 19px; height: 19px; }
-.dock-btn.is-off { border-color: var(--line); background: var(--danger-wash); color: var(--danger); }
+.dock-btn.is-off { border-color: var(--line); background: var(--inactive-wash); color: var(--quiet); }
 .unread-badge { position: absolute; top: 3px; right: 3px; min-width: 17px; padding: 2px 4px; border-radius: 20px; background: var(--accent); color: var(--surface); line-height: 1; text-align: center; }
 
 .leave-button {
     min-height: 44px;
     padding: 0 13px;
-    border-color: color-mix(in srgb, var(--danger) 35%, transparent);
-    background: var(--danger-wash);
+    border-color: color-mix(in srgb, var(--danger) 32%, transparent);
+    border-radius: 12px;
+    background-color: var(--danger-wash);
+    background-image: var(--leave-fill);
+    box-shadow: inset 0 1px 0 var(--glass-sheen), 0 2px 6px #64192c17;
     color: var(--danger);
     white-space: nowrap;
 }
 
-.leave-button:hover { background: color-mix(in srgb, var(--danger) 23%, var(--surface)); }
+.leave-button:hover {
+    background-color: var(--leave-hover);
+    box-shadow: inset 0 1px 0 var(--glass-sheen), 0 4px 12px #64192c36;
+}
+
+.leave-app-icon {
+    width: 24px;
+    height: 24px;
+    flex: none;
+    object-fit: contain;
+    pointer-events: none;
+}
 
 .reaction-popover {
     position: absolute;
@@ -813,6 +846,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
     border-radius: 13px;
     background: var(--surface-raised);
     box-shadow: 0 10px 25px #0004;
+    animation: popover-in 170ms var(--ease-reveal) both;
 }
 
 .reaction-popover button {
@@ -865,7 +899,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
     color: var(--text);
 }
 
-.dialog[open] { animation: window-in 200ms ease-out both; }
+.dialog[open] { animation: window-in 215ms var(--ease-reveal) both; }
 .dialog::backdrop { background: #071e32a0; backdrop-filter: blur(5px); }
 .dialog-header { margin-bottom: 10px; }
 .dialog h2 { margin: 0; font-size: 1.25rem; letter-spacing: -.026em; }
@@ -925,7 +959,7 @@ kbd { min-width: 21px; display: inline-block; padding: 2px 4px; border: 1px soli
     font-size: .875rem;
     line-height: 1.45;
     overflow-wrap: anywhere;
-    animation: inspector-in 190ms ease-out both;
+    animation: inspector-in 190ms var(--ease-reveal) both;
 }
 
 /* Keep video surfaces unfiltered. Glass is applied to the surrounding controls. */
@@ -988,18 +1022,28 @@ kbd { min-width: 21px; display: inline-block; padding: 2px 4px; border: 1px soli
 }
 
 @keyframes window-in {
-    from { opacity: 0; transform: translateY(9px) scale(.989); }
-    to { opacity: 1; transform: translateY(0) scale(1); }
+    from { opacity: 0; transform: translateY(7px) scale(.985); }
+    to { opacity: 1; transform: none; }
 }
 
 @keyframes tile-in {
     from { opacity: 0; transform: scale(.985); }
-    to { opacity: 1; transform: scale(1); }
+    to { opacity: 1; transform: none; }
 }
 
 @keyframes inspector-in {
-    from { opacity: 0; transform: translateY(5px); }
-    to { opacity: 1; transform: translateY(0); }
+    from { opacity: 0; transform: translateX(4px); }
+    to { opacity: 1; transform: none; }
+}
+
+@keyframes dock-in {
+    from { opacity: 0; transform: translateY(8px) scale(.985); }
+    to { opacity: 1; transform: none; }
+}
+
+@keyframes popover-in {
+    from { opacity: 0; translate: 0 4px; }
+    to { opacity: 1; translate: none; }
 }
 
 @keyframes reaction-rise {
@@ -1007,6 +1051,13 @@ kbd { min-width: 21px; display: inline-block; padding: 2px 4px; border: 1px soli
     20% { opacity: 1; }
     75% { opacity: 1; }
     100% { opacity: 0; transform: translateY(-55px) scale(1.08); }
+}
+
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+    .dock-btn:not(:disabled):not(:active):hover {
+        transform: translateY(-1px);
+        box-shadow: var(--lift-shadow);
+    }
 }
 
 @media (max-width: 840px) {
@@ -1099,7 +1150,8 @@ kbd { min-width: 21px; display: inline-block; padding: 2px 4px; border: 1px soli
     .dock { max-width: 100%; }
     .dock-btn { min-width: 45px; min-height: 46px; padding: 4px 5px; font-size: .68rem; }
     .dock-btn .icon { width: 15px; height: 15px; }
-    .leave-button { min-height: 40px; padding-inline: 9px; }
+    .leave-button { min-height: 44px; padding-inline: 9px; }
+    .leave-app-icon { width: 21px; height: 21px; }
     .tile-actions { top: 5px; right: 5px; gap: 3px; }
     .tile-actions .icon-btn { min-height: 33px; min-width: 33px; }
     .tile-actions .icon { width: 15px; height: 15px; }
