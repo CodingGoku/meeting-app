@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#e2f4ff">
+  <meta name="theme-color" content="#e3f0fc">
   <meta name="description" content="Start or join a video meeting with MeetStream Pro.">
   <title>MeetStream Pro</title>
   <link rel="icon" href="assets/marine-meetstream-icon.webp" type="image/webp">
-  <link rel="stylesheet" href="styles.css?v=9">
-  <script type="module" src="app.js?v=9"></script>
+  <link rel="stylesheet" href="styles.css?v=10">
+  <script type="module" src="app.js?v=10"></script>
 </head>
 <body>
   <main id="lobby" class="lobby-shell">
@@ -54,13 +54,13 @@
           <button id="enter-button" class="primary" type="submit"><span data-icon="logIn"></span><span id="enter-label">Join meeting</span></button>
         </form>
         <section id="recent" class="recent" aria-labelledby="recent-heading" hidden>
-          <div class="recent-heading"><h3 id="recent-heading">Recent rooms</h3><button id="clear-recent" class="text-button" type="button">Clear</button></div>
+          <div class="recent-heading"><h3 id="recent-heading">Recent rooms</h3><button id="clear-recent" class="text-button" type="button"><span data-icon="trash"></span> Clear</button></div>
           <ul id="recent-list"></ul>
         </section>
       </section>
     </div>
 
-    <footer class="window-footer"><span><span data-icon="check"></span> No account required</span><button type="button" class="text-button" data-shortcuts>Keyboard shortcuts</button></footer>
+    <footer class="window-footer"><span><span data-icon="check"></span> No account required</span><button type="button" class="text-button" data-shortcuts><span data-icon="keyboard"></span> Keyboard shortcuts</button></footer>
   </main>
 
   <main id="meeting" class="meeting-shell" hidden>
@@ -79,13 +79,13 @@
         <div class="stage-bar">
           <span id="participant-count" class="stage-count"><span data-icon="people"></span><span id="count-label">1 participant</span></span>
           <button id="enable-audio" type="button" class="secondary" hidden><span data-icon="volume"></span> Enable audio</button>
-          <button id="retry-media" type="button" class="secondary" hidden>Retry media</button>
+          <button id="retry-media" type="button" class="secondary" hidden><span data-icon="retry"></span> Retry media</button>
           <button id="fullscreen-button" type="button" class="icon-btn" aria-label="Enter full screen" title="Enter full screen (F)" data-icon="fullscreen"></button>
         </div>
         <div id="video-grid" class="video-grid"></div>
         <div id="stage-empty" class="stage-empty">
           <p>You're the only one here.</p>
-          <button id="empty-invite" type="button" class="text-button">Invite someone</button>
+          <button id="empty-invite" type="button" class="text-button"><span data-icon="link"></span> Invite someone</button>
         </div>
         <div id="reaction-layer" class="reaction-layer" aria-live="polite"></div>
       </section>
@@ -127,7 +127,7 @@
         <button id="chat-button" type="button" class="dock-btn" aria-controls="inspector" aria-pressed="false"><span data-icon="chat"></span><span>Chat</span><span id="chat-unread" class="unread-badge" hidden></span></button>
         <button id="notes-button" type="button" class="dock-btn" aria-controls="inspector" aria-pressed="false"><span data-icon="note"></span><span>Notes</span></button>
       </div>
-      <button id="leave-button" type="button" class="leave-button"><img class="leave-app-icon" src="assets/leave-glass.webp" width="24" height="24" alt=""><span>Leave</span></button>
+      <button id="leave-button" type="button" class="leave-button"><span data-icon="leave"></span><span>Leave</span></button>
     </footer>
   </main>
 
@@ -137,16 +137,9 @@
     <label for="invite-link">Invite link</label>
     <input id="invite-link" readonly>
     <div class="dialog-actions">
-      <button id="copy-code" type="button" class="secondary">Copy code</button>
+      <button id="copy-code" type="button" class="secondary"><span data-icon="copy"></span> Copy code</button>
       <button id="copy-invite" type="button" class="primary"><span data-icon="copy"></span> Copy link</button>
     </div>
-  </dialog>
-
-  <dialog id="share-dialog" class="dialog" aria-labelledby="share-title">
-    <form method="dialog" class="dialog-header"><h2 id="share-title">Share your screen</h2><button class="icon-btn" aria-label="Close" data-icon="close"></button></form>
-    <p>Choose a tab, window, or screen in your browser's screen picker.</p>
-    <label class="checkbox-line"><input id="share-audio" type="checkbox"> Include audio when available</label>
-    <button id="start-share" type="button" class="primary"><span data-icon="screen"></span> Choose what to share</button>
   </dialog>
 
   <dialog id="call-settings" class="dialog call-settings" aria-labelledby="call-settings-title">
@@ -166,7 +159,7 @@
       <button id="copy-diagnostics" class="secondary" type="button" disabled><span data-icon="copy"></span> Copy diagnostics</button>
       <textarea id="diagnostics-text" aria-label="Connection diagnostics to copy" readonly hidden></textarea>
     </section>
-    <button type="button" class="text-button" data-shortcuts>Keyboard shortcuts</button>
+    <button type="button" class="text-button" data-shortcuts><span data-icon="keyboard"></span> Keyboard shortcuts</button>
   </dialog>
 
   <dialog id="shortcuts-dialog" class="dialog" aria-labelledby="shortcuts-title">
@@ -174,8 +167,7 @@
     <dl class="shortcut-list">
       <div><dt>Toggle microphone</dt><dd><kbd>M</kbd> / <kbd>1</kbd></dd></div>
       <div><dt>Toggle camera</dt><dd><kbd>V</kbd> / <kbd>2</kbd></dd></div>
-      <div><dt>Share screen with audio</dt><dd><kbd>3</kbd></dd></div>
-      <div><dt>Open screen share options</dt><dd><kbd>S</kbd></dd></div>
+      <div><dt>Share or stop sharing your screen</dt><dd><kbd>S</kbd> / <kbd>3</kbd></dd></div>
       <div><dt>Raise or lower hand</dt><dd><kbd>H</kbd></dd></div>
       <div><dt>Open chat</dt><dd><kbd>C</kbd></dd></div>
       <div><dt>Open private notes</dt><dd><kbd>N</kbd></dd></div>

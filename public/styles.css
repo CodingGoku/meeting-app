@@ -2,48 +2,55 @@
     color-scheme: dark;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     font-synthesis: none;
-    --background: #101a2a;
-    --surface: #162539;
-    --surface-raised: #1d2e45;
-    --surface-soft: #243952;
-    --surface-hover: #304a65;
-    --stage: #15263b;
-    --line: #c5def728;
-    --line-strong: #c5def74d;
-    --text: #f5f9ff;
-    --muted: #cedbea;
-    --quiet: #b1c3d8;
-    --accent: #a8ddff;
-    --accent-wash: #78bafb2d;
-    --focus: #94d9ff;
+    --background: #101b39;
+    --surface: #17284b;
+    --surface-raised: #20355a;
+    --surface-soft: #243e64;
+    --surface-hover: #315387;
+    --stage: #152648;
+    --line: #bfdcff37;
+    --line-strong: #bfdcff5c;
+    --text: #f4f8ff;
+    --muted: #d3e6ff;
+    --quiet: #aec7e7;
+    --accent: #a9e2ff;
+    --accent-wash: #6b9efe36;
+    --focus: #a7e8ff;
     --danger: #ffc0c9;
     --danger-wash: #ef6c8128;
     --inactive-wash: #d5e4fa1b;
     --green: #77e0ae;
     --pending: #ffc568;
-    --wallpaper: radial-gradient(ellipse 70% 72% at 4% -6%, #285783 0%, transparent 73%),
-        radial-gradient(ellipse 65% 84% at 101% 103%, #174c85 0%, transparent 76%),
-        radial-gradient(ellipse 53% 40% at 85% 9%, #2c596a 0%, transparent 74%),
-        linear-gradient(152deg, #1e3857 0%, #101a2b 59%, #132b47 100%);
-    --glass-window: #182a40c7;
-    --glass-chrome: #293e588f;
-    --glass-panel: #233a52bb;
-    --glass-stage: #16273ac2;
-    --glass-recess: #132337b8;
-    --glass-edge: #c7e4ff50;
-    --glass-sheen: #e8f4ff50;
-    --glass-lowlight: #09182579;
-    --glass-coat: radial-gradient(ellipse at 3% 0%, #d0eaff24, transparent 65%),
-        linear-gradient(145deg, #c8e6ff12 0%, transparent 52%, #75aaff1c 100%);
-    --control-coat: linear-gradient(155deg, #eaf6ff32, transparent 64%, #73b9f016);
-    --window-shadow: 0 30px 92px #080f217d, 0 8px 22px #090f2154;
-    --panel-shadow: 0 12px 32px #080f2545, inset 0 1px 1px var(--glass-sheen), inset 0 -1px 1px var(--glass-lowlight);
-    --tile-frame: #a2cdf34a;
-    --tile-shade: radial-gradient(ellipse at 26% 15%, #294760, #1c344e 56%, #17293f 100%);
+    --wallpaper: radial-gradient(ellipse 61% 45% at 9% -6%, #436980 0%, transparent 76%),
+        radial-gradient(ellipse 73% 64% at 102% 8%, #155c81 0%, transparent 73%),
+        radial-gradient(ellipse 81% 100% at 96% 108%, #1d4ea7 0%, transparent 79%),
+        linear-gradient(155deg, #223a68, #101a36 59%, #173673);
+    --glass-window: #172953d6;
+    --glass-chrome: #20365cbf;
+    --glass-panel: #203760d7;
+    --glass-stage: #142749cc;
+    --glass-recess: #142543d4;
+    --glass-edge: #b4dcff57;
+    --glass-sheen: #e4f7ff75;
+    --glass-lowlight: #080f405e;
+    --glass-reflection: #69b7fc44;
+    --glass-coat: radial-gradient(ellipse 125% 55% at 5% -10%, #c8f5ff34, transparent 75%),
+        radial-gradient(ellipse 80% 45% at 102% 107%, #487cfe3d, transparent 74%),
+        linear-gradient(144deg, #84beff15, transparent 56%, #2877b82a);
+    --glass-stage-coat: radial-gradient(ellipse 66% 45% at 100% 100%, #3a77f228, transparent 80%),
+        linear-gradient(154deg, #8bd4fa11, transparent 51%);
+    --control-coat: radial-gradient(ellipse at 22% -25%, #e2fbff32, transparent 74%),
+        linear-gradient(160deg, transparent 48%, #6aa9ff26);
+    --window-shadow: 0 30px 92px #0a123981, 0 8px 22px #0f1e5d67;
+    --panel-shadow: 0 12px 32px #09163e45, inset 0 1px 1px var(--glass-sheen),
+        inset 0 -2px 4px var(--glass-reflection);
+    --tile-frame: #add5ff66;
+    --tile-shade: radial-gradient(ellipse at 25% 12%, #345981, #213b64 56%, #16294e 100%);
     --avatar-shadow: #0c172759;
-    --primary-fill: linear-gradient(180deg, #e4f3ff 0%, #b2deff 38%, #84baf0 100%);
-    --primary-ink: #102c4a;
-    --primary-edge: #b6dcff;
+    --primary-fill: radial-gradient(ellipse 93% 70% at 18% -40%, #d1f7fff2, transparent 90%),
+        linear-gradient(173deg, #3269cb, #1f50b8 45%, #18398c 100%);
+    --primary-ink: #fff;
+    --primary-edge: #a6d8fc8c;
     --leave-fill: linear-gradient(148deg, #f9b9bf31 0%, #77344654 72%, #642b3c62);
     --leave-hover: #743646;
     --lift-shadow: 0 4px 12px #07142550, inset 0 1px 0 var(--glass-sheen);
@@ -53,47 +60,51 @@
 
 [data-theme="light"] {
     color-scheme: light;
-    --background: #e3edf8;
-    --surface: #f5f9fe;
+    --background: #e3f0fc;
+    --surface: #f1f8ff;
     --surface-raised: #ffffff;
-    --surface-soft: #ebf3fc;
-    --surface-hover: #dceafd;
-    --stage: #edf5fc;
-    --line: #233f6527;
-    --line-strong: #233f6547;
-    --text: #152a42;
-    --muted: #3d556d;
-    --quiet: #4c6178;
-    --accent: #06568b;
-    --accent-wash: #2078c91e;
-    --focus: #0a68b1;
+    --surface-soft: #eaf4ff;
+    --surface-hover: #d7e9ff;
+    --stage: #eaf5ff;
+    --line: #1d498435;
+    --line-strong: #1d49845b;
+    --text: #10254e;
+    --muted: #304a68;
+    --quiet: #3f5877;
+    --accent: #144b9f;
+    --accent-wash: #337ad924;
+    --focus: #174bb3;
     --danger: #9e2540;
     --danger-wash: #bc3b571d;
     --inactive-wash: #254a7516;
     --green: #157752;
     --pending: #92540b;
-    --wallpaper: radial-gradient(ellipse 70% 75% at 1% 1%, #fcfeff 0%, transparent 78%),
-        radial-gradient(ellipse 60% 76% at 97% 1%, #c7eaf4 0%, transparent 77%),
-        radial-gradient(ellipse 65% 92% at 105% 100%, #8bb0e5 0%, transparent 78%),
-        linear-gradient(153deg, #e9f3fd 0%, #cedfeb 62%, #b2d0f2 100%);
-    --glass-window: #f0f7fec9;
-    --glass-chrome: #f8fbffd1;
-    --glass-panel: #f5faffcb;
-    --glass-stage: #edf6ffc0;
-    --glass-recess: #f6faffbe;
-    --glass-edge: #ffffffed;
-    --glass-sheen: #ffffffef;
-    --glass-lowlight: #4778a43b;
-    --glass-coat: radial-gradient(ellipse at 4% 0%, #ffffffa9, transparent 65%),
-        linear-gradient(145deg, #ffffff5c 0%, transparent 52%, #b1d6ff3e 100%);
-    --control-coat: linear-gradient(157deg, #ffffffc4, transparent 65%, #b4d6fb3a);
-    --window-shadow: 0 34px 85px #234b7935, 0 6px 19px #2f5d8529;
-    --panel-shadow: 0 12px 30px #1f538c22, inset 0 1px 1px var(--glass-sheen), inset 0 -1px 1px var(--glass-lowlight);
-    --tile-frame: #ffffffdf;
-    --tile-shade: radial-gradient(ellipse at 27% 12%, #f7fbff, #e5effb 56%, #c4d8ef 100%);
+    --wallpaper: radial-gradient(ellipse 62% 63% at 0% -13%, #f3e5ca 0%, transparent 70%),
+        radial-gradient(ellipse 71% 72% at 91% 0%, #91deec 0%, transparent 80%),
+        radial-gradient(ellipse 84% 100% at 105% 110%, #5685de 0%, transparent 80%),
+        linear-gradient(148deg, #f4f9ff 0%, #daedfc 54%, #a1bef2 100%);
+    --glass-window: #edf7ffd4;
+    --glass-chrome: #f5fbffe0;
+    --glass-panel: #eef8ffd9;
+    --glass-stage: #ecf6ffcc;
+    --glass-recess: #f9fcffcf;
+    --glass-edge: #fdfffff0;
+    --glass-sheen: #fffffffd;
+    --glass-lowlight: #3e6fb451;
+    --glass-reflection: #497de84a;
+    --glass-coat: radial-gradient(ellipse 120% 61% at 12% -13%, #faffffe6, transparent 76%),
+        radial-gradient(ellipse 94% 42% at 108% 105%, #79adf154, transparent 78%),
+        linear-gradient(153deg, #e6ffff8c 0%, transparent 51%, #b2e4f544);
+    --glass-stage-coat: radial-gradient(ellipse 76% 59% at 97% 108%, #94baff4f, transparent 81%),
+        linear-gradient(156deg, #ffffff7a, transparent 51%);
+    --control-coat: radial-gradient(ellipse at 25% -30%, #ffffffee, transparent 80%),
+        linear-gradient(160deg, transparent 49%, #a7ccf946);
+    --window-shadow: 0 34px 85px #23488043, 0 6px 19px #20459632;
+    --panel-shadow: 0 12px 30px #1c4b932d, inset 0 1px 1px var(--glass-sheen),
+        inset 0 -2px 4px var(--glass-reflection);
+    --tile-frame: #edf8ff;
+    --tile-shade: radial-gradient(ellipse at 27% 12%, #f8fdff, #dfedff 58%, #b9d2f6 100%);
     --avatar-shadow: #345b8942;
-    --primary-fill: linear-gradient(180deg, #fcfeff 0%, #c3e2ff 35%, #96c4f4 100%);
-    --primary-edge: #7aa9dcac;
     --leave-fill: linear-gradient(148deg, #fff7f9 0%, #f6d9e1 70%, #f2cbd5);
     --leave-hover: #f7d5df;
     --lift-shadow: 0 4px 11px #2d5f8a36, inset 0 1px 0 var(--glass-sheen);
@@ -135,6 +146,19 @@ button, a { -webkit-tap-highlight-color: transparent; }
     width: 1.125rem;
     height: 1.125rem;
     vertical-align: middle;
+    pointer-events: none;
+}
+
+.icon-image {
+    display: inline-block;
+    background: url("assets/control-icons.webp") var(--icon-x) var(--icon-y) / 400% 900% no-repeat;
+}
+
+.icon-fallback { display: none; }
+
+@media (forced-colors: active) {
+    .icon-image { display: none; }
+    .icon-fallback { display: inline-block; }
 }
 
 .lobby-shell {
@@ -155,7 +179,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
     z-index: 2;
     inset: 0;
     border-radius: inherit;
-    box-shadow: inset 0 1px 2px var(--glass-sheen), inset 0 -1px 2px var(--glass-lowlight);
+    box-shadow: inset 0 1px 2px var(--glass-sheen), inset 0 -2px 4px var(--glass-reflection);
     pointer-events: none;
     content: "";
 }
@@ -292,8 +316,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
     padding: 42px;
     border-inline-end: 1px solid #ffffff16;
     background:
-        radial-gradient(ellipse at 50% 33%, #61bdd5 0%, #296b88 29%, transparent 68%),
-        linear-gradient(155deg, #1f5571 0%, #103246 59%, #0a2234 100%);
+        radial-gradient(ellipse at 38% 19%, #91d9eb 0%, #3e80b6 30%, transparent 67%),
+        linear-gradient(154deg, #285ab0 0%, #142e68 58%, #102044 100%);
     color: #f3fbff;
 }
 
@@ -301,7 +325,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
     position: absolute;
     z-index: -1;
     inset: 0;
-    background: linear-gradient(180deg, transparent 37%, #06223622 51%, #062236b0 74%, #061e30fa 100%);
+    background: radial-gradient(ellipse 105% 58% at 5% 111%, #182c7b94, transparent 80%),
+        linear-gradient(180deg, transparent 37%, #122c5c23 50%, #10244fc9 75%, #0e2044 100%);
     pointer-events: none;
     content: "";
 }
@@ -330,7 +355,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
     text-wrap: balance;
 }
 
-.hero-copy p { max-width: 33ch; margin: 0; color: #d1e8f1; line-height: 1.55; }
+.hero-copy p { max-width: 33ch; margin: 0; color: #d8ecff; line-height: 1.55; }
 
 .lobby-content {
     display: flex;
@@ -443,14 +468,14 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
     min-height: 46px;
     border-color: var(--primary-edge);
     background: var(--primary-fill);
-    box-shadow: inset 0 1px 1px #ffffffd4, inset 0 -1px 1px #2458943e, 0 6px 17px #315e9e32;
+    box-shadow: inset 0 1px 1px #dff8ffae, inset 0 -2px 5px #82bdff55, 0 6px 17px #2046a74b;
     color: var(--primary-ink);
     font-weight: 750;
 }
 
 .primary:hover {
     filter: brightness(1.035);
-    box-shadow: inset 0 1px 1px #fff, inset 0 -1px 1px #2458943e, 0 7px 22px #315e9e50;
+    box-shadow: inset 0 1px 1px #fcfeffc9, inset 0 -2px 5px #82bdff55, 0 7px 22px #2046a765;
 }
 
 .recent { display: grid; gap: 6px; margin-top: 14px; }
@@ -462,7 +487,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
 .recent-row:hover { background: var(--surface-hover); }
 .recent-code { min-width: 0; overflow-wrap: anywhere; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .85rem; }
 .recent-date { margin-inline-start: auto; color: var(--quiet); font-size: .8rem; }
-.text-button { padding: 4px 0; border: 0; border-radius: 3px; background: transparent; color: var(--accent); font: inherit; font-weight: 630; }
+.text-button { display: inline-flex; align-items: center; gap: 5px; padding: 4px 0; border: 0; border-radius: 3px; background: transparent; color: var(--accent); font: inherit; font-weight: 630; }
 .text-button:hover { text-decoration: underline; }
 
 .window-footer {
@@ -802,7 +827,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
 }
 
 .dock-btn:hover { color: var(--text); }
-.dock-btn .icon { width: 19px; height: 19px; }
+.dock-btn .icon { width: 23px; height: 23px; }
 .dock-btn.is-off { border-color: var(--line); background: var(--inactive-wash); color: var(--quiet); }
 .unread-badge { position: absolute; top: 3px; right: 3px; min-width: 17px; padding: 2px 4px; border-radius: 20px; background: var(--accent); color: var(--surface); line-height: 1; text-align: center; }
 
@@ -813,23 +838,17 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
     border-radius: 12px;
     background-color: var(--danger-wash);
     background-image: var(--leave-fill);
-    box-shadow: inset 0 1px 0 var(--glass-sheen), 0 2px 6px #64192c17;
+    box-shadow: 0 2px 6px #64192c17;
     color: var(--danger);
     white-space: nowrap;
 }
 
 .leave-button:hover {
     background-color: var(--leave-hover);
-    box-shadow: inset 0 1px 0 var(--glass-sheen), 0 4px 12px #64192c36;
+    box-shadow: 0 3px 8px #64192c2b;
 }
 
-.leave-app-icon {
-    width: 24px;
-    height: 24px;
-    flex: none;
-    object-fit: contain;
-    pointer-events: none;
-}
+.leave-button .icon { width: 24px; height: 24px; }
 
 .reaction-popover {
     position: absolute;
@@ -856,10 +875,10 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
     border: 1px solid transparent;
     border-radius: 8px;
     background: transparent;
-    font-size: 1.2rem;
     transition: background 150ms ease, transform 150ms ease;
 }
 
+.reaction-popover button .icon { width: 26px; height: 26px; }
 .reaction-popover button:hover { transform: translateY(-2px); background: var(--surface-hover); }
 .dock-btn[aria-expanded="true"] { background: var(--accent-wash); color: var(--accent); }
 
@@ -905,7 +924,6 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
 .dialog h2 { margin: 0; font-size: 1.25rem; letter-spacing: -.026em; }
 .dialog p { margin: 0 0 13px; color: var(--muted); line-height: 1.5; }
 .dialog label { display: flex; align-items: center; gap: 9px; margin-bottom: 8px; font-size: .88rem; }
-.dialog .checkbox-line { min-height: 38px; }
 .dialog menu, .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin: 14px 0 0; padding: 0; }
 .call-settings { width: min(520px, calc(100% - 28px)); max-height: calc(100dvh - 28px); overflow: auto; }
 .call-settings h3 { margin: 0 0 10px; font-size: .94rem; }
@@ -996,7 +1014,7 @@ kbd { min-width: 21px; display: inline-block; padding: 2px 4px; border: 1px soli
     .stage {
         border-color: var(--glass-edge);
         background-color: var(--glass-stage);
-        background-image: var(--glass-coat);
+        background-image: var(--glass-stage-coat);
     }
 
     .segmented, .inspector-tabs,
@@ -1149,9 +1167,9 @@ kbd { min-width: 21px; display: inline-block; padding: 2px 4px; border: 1px soli
     .meeting-footer { z-index: 4; padding-top: 6px; }
     .dock { max-width: 100%; }
     .dock-btn { min-width: 45px; min-height: 46px; padding: 4px 5px; font-size: .68rem; }
-    .dock-btn .icon { width: 15px; height: 15px; }
+    .dock-btn .icon { width: 19px; height: 19px; }
     .leave-button { min-height: 44px; padding-inline: 9px; }
-    .leave-app-icon { width: 21px; height: 21px; }
+    .leave-button .icon { width: 21px; height: 21px; }
     .tile-actions { top: 5px; right: 5px; gap: 3px; }
     .tile-actions .icon-btn { min-height: 33px; min-width: 33px; }
     .tile-actions .icon { width: 15px; height: 15px; }

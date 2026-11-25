@@ -1,5 +1,5 @@
-import { initIcons, setIcon } from './icons.js?v=9';
-import { MeetingMedia } from './media.js?v=9';
+import { initIcons, setIcon } from './icons.js?v=10';
+import { MeetingMedia } from './media.js?v=10';
 import { RelayMedia } from './relay-media.js?v=9';
 import { mountCallSettings } from './call-settings.js?v=9';
 
@@ -12,8 +12,8 @@ const lobbyForm = $('lobby-form');
 const lobbyInputs = [...lobbyForm.elements];
 const notes = $('meeting-notes');
 const reactions = [
-  ['👍', 'Thumbs up'], ['👏', 'Applause'], ['❤️', 'Heart'],
-  ['🎉', 'Celebrate'], ['😂', 'Laugh'], ['😮', 'Surprised']
+  ['👍', 'Thumbs up', 'thumbsUp'], ['👏', 'Applause', 'applause'], ['❤️', 'Heart', 'heart'],
+  ['🎉', 'Celebrate', 'celebrate'], ['😂', 'Laugh', 'laugh'], ['😮', 'Surprised', 'surprised']
 ];
 const sidebarTabs = ['people', 'chat', 'notes'];
 const roomCodePattern = /^[A-Z0-9]{4,16}$/;
@@ -71,7 +71,7 @@ function notify(message) {
 function applyTheme(value) {
   theme = value === 'dark' ? 'dark' : 'light';
   document.documentElement.dataset.theme = theme;
-  document.querySelector('meta[name="theme-color"]').content = theme === 'light' ? '#e2f4ff' : '#0b2337';
+  document.querySelector('meta[name="theme-color"]').content = theme === 'light' ? '#e3f0fc' : '#101b39';
   document.querySelectorAll('[data-theme-toggle]').forEach(button => {
     const label = theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme';
     button.setAttribute('aria-label', label);
@@ -1022,16 +1022,15 @@ function toggleHand() {
 }
 
 function toggleShare() {
-  if (active?.mediaState.sharing) active.media.toggleShare();
-  else if (active) $('share-dialog').showModal();
+  active?.media.toggleShare();
 }
 
-for (const [emoji, name] of reactions) {
+for (const [emoji, name, icon] of reactions) {
   const button = document.createElement('button');
   button.type = 'button';
   button.setAttribute('aria-label', name);
   button.title = name;
-  button.textContent = emoji;
+  setIcon(button, icon);
   button.addEventListener('click', () => {
     meetingAction('reaction', { reaction: emoji });
     setReactionPicker(false);
@@ -1096,10 +1095,6 @@ $('retry-media').addEventListener('click', () => {
 $('mic-button').addEventListener('click', () => active?.media.toggleMic());
 $('camera-button').addEventListener('click', () => active?.media.toggleCamera());
 $('share-button').addEventListener('click', toggleShare);
-$('start-share').addEventListener('click', () => {
-  $('share-dialog').close();
-  active?.media.toggleShare($('share-audio').checked);
-});
 $('hand-button').addEventListener('click', toggleHand);
 $('reaction-button').addEventListener('click', () => setReactionPicker($('reactions').hidden));
 $('leave-button').addEventListener('click', () => leaveMeeting());
@@ -1165,7 +1160,7 @@ document.addEventListener('keydown', event => {
   const actions = {
     m: () => active.media.toggleMic(),
     v: () => active.media.toggleCamera(),
-    3: () => active.media.toggleShare(true),
+    3: toggleShare,
     s: toggleShare,
     h: toggleHand,
     c: () => { setSidebar('chat'); $('chat-input').focus(); },

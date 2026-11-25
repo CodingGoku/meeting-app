@@ -27,4 +27,6 @@ When both browsers support VP8 through WebCodecs, relay video uses low-latency e
 
 On browsers with a media track processor, relayed screen sharing reads captured frames directly so it can continue while you work in the shared window. Browsers without that API use the local video preview for the relay.
 
+Choose whether to include the tab or device audio in the browser's screen-sharing picker. The audio options depend on the browser and the selected source.
+
 Public deployments should use HTTPS and forward WebSocket upgrades on both `/` and `/media`. MeetStream prefers the separate `/media` connection for relay video and can use the signaling socket when that route is unavailable. Signaling reconnects within 15 seconds preserve the participant's membership and existing media connections.

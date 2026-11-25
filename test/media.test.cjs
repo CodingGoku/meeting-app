@@ -84,3 +84,58 @@ test('keeps signaling attached to the current ICE generation after reconnect', a
     assert.deepEqual(sent.slice(1).map(item => item.payload.data.candidate), [currentCandidate, end]);
     assert(sent.every(item => item.payload.toParticipantId === 'current-participant'));
 });
+
+test('accepts audio from one screen picker and shares silently when none is selected', async t => {
+    const { MeetingMedia } = await import(moduleUrl);
+    const mediaDevices = Object.getOwnPropertyDescriptor(navigator, 'mediaDevices');
+    t.after(() => {
+        if (mediaDevices) Object.defineProperty(navigator, 'mediaDevices', mediaDevices);
+        else Reflect.deleteProperty(navigator, 'mediaDevices');
+    });
+
+    const requests = [];
+    let choose;
+    Object.defineProperty(navigator, 'mediaDevices', {
+        configurable: true,
+        value: {
+            getDisplayMedia(options) {
+                requests.push(options);
+                return new Promise(resolve => { choose = resolve; });
+            }
+        }
+    });
+    const makeTrack = () => Object.assign(new EventTarget(), {
+        readyState: 'live',
+        stop() { this.readyState = 'ended'; }
+    });
+    const makeStream = (video, audio = []) => ({
+        getVideoTracks: () => [video],
+        getAudioTracks: () => audio,
+        getTracks: () => [video, ...audio]
+    });
+    const notices = [];
+    const media = Object.assign(Object.create(MeetingMedia.prototype), {
+        devices: {},
+        notify: message => notices.push(message),
+        startAudioMix() {},
+        async refresh() {}
+    });
+
+    const audio = makeTrack();
+    const pending = media.toggleShare();
+    await media.toggleShare();
+    assert.equal(requests.length, 1);
+    assert.equal(requests[0].audio, true);
+    assert.equal(requests[0].systemAudio, 'include');
+    choose(makeStream(makeTrack(), [audio]));
+    assert.equal((await pending).sharing, true);
+    assert.equal(media.outgoingAudio(), audio);
+    assert.equal((await media.toggleShare()).sharing, false);
+    assert.equal(audio.readyState, 'ended');
+
+    const silentShare = media.toggleShare();
+    choose(makeStream(makeTrack()));
+    assert.equal((await silentShare).sharing, true);
+    assert.equal(media.outgoingAudio(), null);
+    assert.deepEqual(notices, []);
+});

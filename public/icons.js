@@ -1,3 +1,16 @@
+// Row order in control-icons.webp. Each tile is the same size, including transparent padding.
+const iconNames = [
+  'mic', 'micOff', 'video', 'videoOff',
+  'screen', 'smile', 'hand', 'people',
+  'chat', 'note', 'pin', 'leave',
+  'moon', 'sun', 'settings', 'link',
+  'fullscreen', 'fullscreenExit', 'volume', 'close',
+  'logIn', 'plus', 'copy', 'send',
+  'keyboard', 'download', 'check', 'clock',
+  'retry', 'trash', 'thumbsUp', 'applause',
+  'heart', 'celebrate', 'laugh', 'surprised'
+];
+
 const paths = {
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
   moon: '<path d="M20.9 13.4A9 9 0 1 1 10.6 3.1a7.2 7.2 0 0 0 10.3 10.3Z"/>',
@@ -25,12 +38,29 @@ const paths = {
   copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
   pin: '<path d="m15 3 6 6-3 1-3 4v3l-1 1-3.5-3.5L5 20m5.5-5.5L7 11l1-1h3l3-4 1-3Z"/>',
   check: '<path d="m5 12 4.5 4.5L19 7"/>',
-  clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/>'
+  clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/>',
+  leave: '<path d="M3 15c0-2 4-5 9-5s9 3 9 5v1a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-1a9 9 0 0 0-6 0v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1Z"/>',
+  retry: '<path d="M20 10a8 8 0 1 0-1 7M20 4v6h-6"/>',
+  trash: '<path d="M3 6h18M9 6V4h6v2M6 6l1 14h10l1-14M10 10v6m4-6v6"/>',
+  thumbsUp: '<path d="M7 10v10H4V10h3Zm0 9h10a2 2 0 0 0 2-1.7l1-6A2 2 0 0 0 18 9h-5l1-4c0-1-1.5-2-2.5-.5L7 10"/>',
+  applause: '<path d="m7 13 2.5 2-1-6a1.5 1.5 0 0 1 3-.5l1 5L15 8a1.5 1.5 0 0 1 2.5 1.5l-2 5.5 2-2a1.5 1.5 0 0 1 2 2l-4 5a5 5 0 0 1-6 .5L5 16a1.6 1.6 0 0 1 2-3ZM5 7 3 5m6 0V2m5 3 2-2"/>',
+  heart: '<path d="M12 20 4.5 13a5 5 0 0 1 7.5-6.5 5 5 0 0 1 7.5 6.5L12 20Z"/>',
+  celebrate: '<path d="m4 20 3.5-11 7.5 7.5L4 20Zm8-12V5m4 4 3-3m-2 6h3M7 13l4 4"/>',
+  laugh: '<circle cx="12" cy="12" r="9"/><path d="m6.5 8 3 2-3 1.5m11-3.5-3 2 3 1.5M8 14h8a4 4 0 0 1-8 0Z"/>',
+  surprised: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="15.5" r="2.5"/><path d="M8.5 9.5h.01m7 0h.01"/>'
 };
 
 export function setIcon(element, name = element.dataset.icon) {
+  const index = iconNames.indexOf(name);
+  if (index < 0) return;
   element.dataset.icon = name;
-  element.innerHTML = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' + paths[name] + '</svg>';
+  const image = document.createElement('span');
+  image.className = 'icon icon-image';
+  image.setAttribute('aria-hidden', 'true');
+  image.style.setProperty('--icon-x', (index % 4) * 100 / 3 + '%');
+  image.style.setProperty('--icon-y', Math.floor(index / 4) * 100 / 8 + '%');
+  element.innerHTML = '<svg class="icon icon-fallback" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' + paths[name] + '</svg>';
+  element.prepend(image);
 }
 
 export function initIcons(root) {

@@ -174,7 +174,7 @@ export class MeetingMedia {
         return this.toggleDevice('camera');
     }
 
-    async toggleShare(includeAudio = false) {
+    async toggleShare() {
         if (this.destroyed || this.pendingShare) return this.state;
         if (this.displayStream) {
             await this.stopShare(this.displayStream);
@@ -187,10 +187,11 @@ export class MeetingMedia {
 
         this.pendingShare = true;
         try {
-            if (includeAudio) this.startAudioMix();
+            this.startAudioMix();
             const stream = await navigator.mediaDevices.getDisplayMedia({
                 video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 24, max: 30 } },
-                audio: includeAudio
+                audio: true,
+                systemAudio: 'include'
             });
             const [video] = stream.getVideoTracks();
             if (this.destroyed || !isLive(video)) {
@@ -206,7 +207,6 @@ export class MeetingMedia {
                 audio.addEventListener('ended', () => void this.refresh(), { once: true });
             } else {
                 this.closeAudioMix();
-                if (includeAudio) this.notify('The selected source did not provide shared audio');
             }
             await this.refresh();
         } catch (error) {
