@@ -7,6 +7,7 @@ import { mountDock } from './dock.js?v=11';
 const $ = id => document.getElementById(id);
 const lobby = $('lobby');
 const meeting = $('meeting');
+const leaveDialog = $('leave-dialog');
 const inputName = $('display-name');
 const inputRoom = $('room-input');
 const lobbyForm = $('lobby-form');
@@ -1098,7 +1099,13 @@ $('camera-button').addEventListener('click', () => active?.media.toggleCamera())
 $('share-button').addEventListener('click', toggleShare);
 $('hand-button').addEventListener('click', toggleHand);
 $('reaction-button').addEventListener('click', () => setReactionPicker($('reactions').hidden));
-$('leave-button').addEventListener('click', () => leaveMeeting());
+$('leave-button').addEventListener('click', () => {
+  if (active && !leaveDialog.open) leaveDialog.showModal();
+});
+$('confirm-leave').addEventListener('click', () => leaveMeeting());
+leaveDialog.addEventListener('close', () => {
+  if (active && !meeting.hidden && !leaveDialog.open) $('leave-button').focus();
+});
 $('close-inspector').addEventListener('click', () => {
   const previous = openPanel;
   setSidebar(null);
