@@ -8,6 +8,7 @@ const $ = id => document.getElementById(id);
 const lobby = $('lobby');
 const meeting = $('meeting');
 const leaveDialog = $('leave-dialog');
+const compactCall = matchMedia('(max-width: 599px)');
 const inputName = $('display-name');
 const inputRoom = $('room-input');
 const lobbyForm = $('lobby-form');
@@ -1106,13 +1107,25 @@ $('confirm-leave').addEventListener('click', () => leaveMeeting());
 leaveDialog.addEventListener('close', () => {
   if (active && !meeting.hidden && !leaveDialog.open) $('leave-button').focus();
 });
-$('close-inspector').addEventListener('click', () => {
+function closeSidebar() {
   const previous = openPanel;
   setSidebar(null);
-  if (previous) $(previous + '-button').focus();
+  if (previous) $(previous + '-button').focus({ preventScroll: true });
+}
+
+$('close-inspector').addEventListener('click', closeSidebar);
+$('inspector').addEventListener('keydown', event => {
+  if (compactCall.matches && event.key === 'Escape' && openPanel) {
+    event.preventDefault();
+    closeSidebar();
+  }
 });
 for (const name of sidebarTabs) {
-  $(name + '-button').addEventListener('click', () => setSidebar(openPanel === name ? null : name));
+  $(name + '-button').addEventListener('click', () => {
+    const panel = openPanel === name ? null : name;
+    setSidebar(panel);
+    if (panel && compactCall.matches) $(panel + '-tab').focus({ preventScroll: true });
+  });
   $(name + '-tab').addEventListener('click', () => setSidebar(name));
 }
 $('inspector').querySelector('[role=tablist]').addEventListener('keydown', event => {
@@ -1190,6 +1203,27 @@ window.addEventListener('pageshow', event => {
 
 initIcons(document);
 mountDock(meeting.querySelector('.dock'));
+const callViewport = window.visualViewport;
+if (callViewport && matchMedia('(any-pointer: coarse)').matches) {
+  let viewportFrame = 0;
+  const updateCallHeight = () => {
+    if (viewportFrame) return;
+    viewportFrame = requestAnimationFrame(() => {
+      viewportFrame = 0;
+      const focused = document.activeElement;
+      const editing = meeting.contains(focused) && focused.matches('input:not([readonly]), textarea:not([readonly])');
+      // Some mobile keyboards only shrink the visual viewport.
+      if (editing && callViewport.scale === 1 && document.documentElement.clientHeight - callViewport.height > 96) {
+        meeting.style.setProperty('--call-visible-height', Math.round(callViewport.height) + 'px');
+      } else {
+        meeting.style.removeProperty('--call-visible-height');
+      }
+    });
+  };
+  callViewport.addEventListener('resize', updateCallHeight);
+  meeting.addEventListener('focusin', updateCallHeight);
+  meeting.addEventListener('focusout', updateCallHeight);
+}
 mountCallSettings({
   getSession: () => meeting.hidden ? null : active,
   getInputIds: preferredInputs,
