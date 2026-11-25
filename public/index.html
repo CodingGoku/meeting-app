@@ -7,8 +7,8 @@
   <meta name="description" content="Start or join a video meeting with MeetStream Pro.">
   <title>MeetStream Pro</title>
   <link rel="icon" href="assets/marine-meetstream-icon.webp" type="image/webp">
-  <link rel="stylesheet" href="styles.css?v=10">
-  <script type="module" src="app.js?v=10"></script>
+  <link rel="stylesheet" href="styles.css?v=11">
+  <script type="module" src="app.js?v=11"></script>
 </head>
 <body>
   <main id="lobby" class="lobby-shell">
@@ -114,20 +114,20 @@
     </div>
 
     <footer class="meeting-footer">
-      <div class="dock" aria-label="Meeting controls">
-        <button id="mic-button" type="button" class="dock-btn" aria-label="Microphone" aria-pressed="false"><span data-icon="mic"></span><span>Mic</span></button>
-        <button id="camera-button" type="button" class="dock-btn" aria-label="Camera" aria-pressed="false"><span data-icon="video"></span><span>Camera</span></button>
-        <button id="share-button" type="button" class="dock-btn" aria-label="Share screen" aria-pressed="false"><span data-icon="screen"></span><span>Share</span></button>
+      <div class="dock" role="group" aria-label="Meeting controls">
+        <button id="mic-button" type="button" class="dock-btn" aria-label="Microphone" aria-pressed="false"><span class="dock-art" data-icon="mic"></span><span class="dock-label">Mic</span><span class="dock-hint" aria-hidden="true">Microphone</span></button>
+        <button id="camera-button" type="button" class="dock-btn" aria-label="Camera" aria-pressed="false"><span class="dock-art" data-icon="video"></span><span class="dock-label">Camera</span><span class="dock-hint" aria-hidden="true">Camera</span></button>
+        <button id="share-button" type="button" class="dock-btn" aria-label="Share screen" aria-pressed="false"><span class="dock-art" data-icon="screen"></span><span class="dock-label">Share</span><span class="dock-hint" aria-hidden="true">Share screen (S)</span></button>
         <div class="reaction-control">
-          <button id="reaction-button" type="button" class="dock-btn" aria-expanded="false" aria-controls="reactions"><span data-icon="smile"></span><span>React</span></button>
+          <button id="reaction-button" type="button" class="dock-btn" aria-label="React" aria-expanded="false" aria-controls="reactions"><span class="dock-art" data-icon="smile"></span><span class="dock-label">React</span><span class="dock-hint" aria-hidden="true">Send a reaction</span></button>
           <div id="reactions" class="reaction-popover" aria-label="Send a reaction" hidden></div>
         </div>
-        <button id="hand-button" type="button" class="dock-btn" aria-label="Raise hand" aria-pressed="false"><span data-icon="hand"></span><span>Hand</span></button>
-        <button id="people-button" type="button" class="dock-btn" aria-controls="inspector" aria-pressed="false"><span data-icon="people"></span><span>People</span></button>
-        <button id="chat-button" type="button" class="dock-btn" aria-controls="inspector" aria-pressed="false"><span data-icon="chat"></span><span>Chat</span><span id="chat-unread" class="unread-badge" hidden></span></button>
-        <button id="notes-button" type="button" class="dock-btn" aria-controls="inspector" aria-pressed="false"><span data-icon="note"></span><span>Notes</span></button>
+        <button id="hand-button" type="button" class="dock-btn" aria-label="Raise hand" aria-pressed="false"><span class="dock-art" data-icon="hand"></span><span class="dock-label">Hand</span><span class="dock-hint" aria-hidden="true">Raise hand (H)</span></button>
+        <button id="people-button" type="button" class="dock-btn" aria-label="People" aria-controls="inspector" aria-pressed="false"><span class="dock-art" data-icon="people"></span><span class="dock-label">People</span><span class="dock-hint" aria-hidden="true">People</span></button>
+        <button id="chat-button" type="button" class="dock-btn" aria-label="Chat" aria-controls="inspector" aria-pressed="false"><span class="dock-art" data-icon="chat"></span><span class="dock-label">Chat</span><span class="dock-hint" aria-hidden="true">Chat (C)</span><span id="chat-unread" class="unread-badge" hidden></span></button>
+        <button id="notes-button" type="button" class="dock-btn" aria-label="Notes" aria-controls="inspector" aria-pressed="false"><span class="dock-art" data-icon="note"></span><span class="dock-label">Notes</span><span class="dock-hint" aria-hidden="true">Notes (N)</span></button>
+        <button id="leave-button" type="button" class="dock-btn leave-button" aria-label="Leave"><span class="dock-art" data-icon="leave"></span><span class="dock-label">Leave</span><span class="dock-hint" aria-hidden="true">Leave meeting</span></button>
       </div>
-      <button id="leave-button" type="button" class="leave-button"><span data-icon="leave"></span><span>Leave</span></button>
     </footer>
   </main>
 
@@ -168,6 +168,7 @@
       <div><dt>Toggle microphone</dt><dd><kbd>M</kbd> / <kbd>1</kbd></dd></div>
       <div><dt>Toggle camera</dt><dd><kbd>V</kbd> / <kbd>2</kbd></dd></div>
       <div><dt>Share or stop sharing your screen</dt><dd><kbd>S</kbd> / <kbd>3</kbd></dd></div>
+      <div><dt>Move between focused dock controls</dt><dd><kbd>←</kbd> / <kbd>→</kbd></dd></div>
       <div><dt>Raise or lower hand</dt><dd><kbd>H</kbd></dd></div>
       <div><dt>Open chat</dt><dd><kbd>C</kbd></dd></div>
       <div><dt>Open private notes</dt><dd><kbd>N</kbd></dd></div>

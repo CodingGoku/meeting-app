@@ -51,9 +51,6 @@
         linear-gradient(173deg, #3269cb, #1f50b8 45%, #18398c 100%);
     --primary-ink: #fff;
     --primary-edge: #a6d8fc8c;
-    --leave-fill: linear-gradient(148deg, #f9b9bf31 0%, #77344654 72%, #642b3c62);
-    --leave-hover: #743646;
-    --lift-shadow: 0 4px 12px #07142550, inset 0 1px 0 var(--glass-sheen);
     --ease-interaction: cubic-bezier(.2,.8,.24,1);
     --ease-reveal: cubic-bezier(.2,.7,.24,1);
 }
@@ -105,9 +102,6 @@
     --tile-frame: #edf8ff;
     --tile-shade: radial-gradient(ellipse at 27% 12%, #f8fdff, #dfedff 58%, #b9d2f6 100%);
     --avatar-shadow: #345b8942;
-    --leave-fill: linear-gradient(148deg, #fff7f9 0%, #f6d9e1 70%, #f2cbd5);
-    --leave-hover: #f7d5df;
-    --lift-shadow: 0 4px 11px #2d5f8a36, inset 0 1px 0 var(--glass-sheen);
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -263,7 +257,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
     margin-inline-start: auto;
 }
 
-.icon-btn, .secondary, .primary, .dock-btn, .leave-button {
+.icon-btn, .secondary, .primary {
     display: inline-flex;
     min-height: 40px;
     align-items: center;
@@ -281,8 +275,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
 }
 
 .icon-btn { min-width: 40px; padding-inline: 9px; }
-.icon-btn:hover, .secondary:hover, .dock-btn:hover { background: var(--surface-hover); border-color: var(--line-strong); }
-.icon-btn:active, .secondary:active, .primary:active, .dock-btn:active, .leave-button:active { transform: scale(.97); }
+.icon-btn:hover, .secondary:hover { background: var(--surface-hover); border-color: var(--line-strong); }
+.icon-btn:active, .secondary:active, .primary:active { transform: scale(.97); }
 
 .stage-bar .icon-btn, .secondary, .recent-row, .lobby-options label {
     background-image: var(--control-coat);
@@ -455,7 +449,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
 }
 
 .lobby-options label:hover { background: var(--surface-hover); }
-.lobby-options label:has(input:checked), .dock-btn[aria-pressed="true"], .icon-btn[aria-pressed="true"] {
+.lobby-options label:has(input:checked), .icon-btn[aria-pressed="true"] {
     border-color: color-mix(in srgb, var(--accent) 40%, transparent);
     background: var(--accent-wash);
     color: var(--accent);
@@ -788,67 +782,113 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
 .notes-panel textarea { min-height: 155px; flex: 1; padding-block: 10px; line-height: 1.5; resize: vertical; }
 
 .meeting-footer {
+    position: relative;
+    z-index: 4;
     display: flex;
     min-width: 0;
-    align-items: center;
     justify-content: center;
-    gap: 10px;
-    padding: 0 12px max(12px, env(safe-area-inset-bottom));
+    padding: 3px 12px max(12px, env(safe-area-inset-bottom));
     animation: dock-in 270ms var(--ease-reveal) both;
 }
 
 .dock {
+    --dock-item-width: clamp(44px, calc((100vw - 78px) / 9), 61px);
     position: relative;
     display: flex;
-    min-width: 0;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: center;
+    max-width: 100%;
+    align-items: stretch;
     gap: 3px;
-    padding: 6px;
+    padding: 5px 7px;
     border: 1px solid var(--line-strong);
-    border-radius: 19px;
+    border-radius: 22px;
     background: var(--surface-raised);
     box-shadow: 0 10px 30px #0003, inset 0 1px 0 var(--line);
 }
 
 .dock-btn {
     position: relative;
-    min-width: 65px;
-    min-height: 54px;
+    display: flex;
+    width: var(--dock-item-width);
+    min-height: 55px;
+    align-items: center;
+    justify-content: center;
     flex-direction: column;
-    gap: 4px;
-    padding: 5px 8px;
-    border-color: transparent;
+    gap: 2px;
+    padding: 4px 2px 8px;
+    border: 1px solid transparent;
+    border-radius: 14px;
     background: transparent;
-    color: var(--muted);
-    font-size: .73rem;
+    color: var(--text);
+    font-size: .66rem;
+    font-weight: 620;
     white-space: nowrap;
+    touch-action: manipulation;
+    transition: background-color 140ms ease;
 }
 
-.dock-btn:hover { color: var(--text); }
-.dock-btn .icon { width: 23px; height: 23px; }
-.dock-btn.is-off { border-color: var(--line); background: var(--inactive-wash); color: var(--quiet); }
-.unread-badge { position: absolute; top: 3px; right: 3px; min-width: 17px; padding: 2px 4px; border-radius: 20px; background: var(--accent); color: var(--surface); line-height: 1; text-align: center; }
+.dock-btn:is(:hover, :focus-visible) { z-index: 1; background-color: var(--accent-wash); }
+.dock-btn:active { background-color: var(--inactive-wash); }
 
-.leave-button {
-    min-height: 44px;
-    padding: 0 13px;
-    border-color: color-mix(in srgb, var(--danger) 32%, transparent);
-    border-radius: 12px;
-    background-color: var(--danger-wash);
-    background-image: var(--leave-fill);
-    box-shadow: 0 2px 6px #64192c17;
-    color: var(--danger);
-    white-space: nowrap;
+.dock-art {
+    display: grid;
+    flex: none;
+    place-items: center;
+    pointer-events: none;
+    transform: translateY(calc(-1 * var(--dock-lift, 0px))) scale(var(--dock-scale, 1));
+    transform-origin: center bottom;
+    transition: transform 190ms cubic-bezier(.2, .8, .3, 1.15);
 }
 
-.leave-button:hover {
-    background-color: var(--leave-hover);
-    box-shadow: 0 3px 8px #64192c2b;
+.dock-art .icon { width: 28px; height: 28px; }
+.dock-art .icon-image { filter: drop-shadow(0 2px 2px #10264d38); }
+.dock-btn.is-off .dock-art { opacity: .76; }
+.dock-btn:active .dock-art { scale: .93; }
+.dock-label { line-height: 1; }
+.dock-hint { display: none; }
+
+.dock-btn::after {
+    position: absolute;
+    bottom: 3px;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--accent);
+    opacity: 0;
+    pointer-events: none;
+    content: "";
 }
 
-.leave-button .icon { width: 24px; height: 24px; }
+.dock-btn:is([aria-pressed="true"], [aria-expanded="true"])::after { opacity: 1; }
+.dock-btn:is(#mic-button, #camera-button)::after { background: var(--green); }
+
+.unread-badge {
+    position: absolute;
+    z-index: 1;
+    top: 1px;
+    right: 3px;
+    min-width: 17px;
+    padding: 2px 4px;
+    border-radius: 20px;
+    background: var(--accent);
+    color: var(--surface);
+    line-height: 1;
+    text-align: center;
+    pointer-events: none;
+    transform: translateY(calc(-1 * var(--dock-lift, 0px)));
+    transition: transform 190ms cubic-bezier(.2, .8, .3, 1.15);
+}
+
+.leave-button { margin-inline-start: 9px; color: var(--danger); }
+.leave-button:is(:hover, :focus-visible) { background-color: var(--danger-wash); }
+.leave-button::before {
+    position: absolute;
+    inset-block: 5px;
+    inset-inline-start: -8px;
+    width: 1px;
+    background: var(--line-strong);
+    pointer-events: none;
+    content: "";
+}
 
 .reaction-popover {
     position: absolute;
@@ -880,7 +920,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
 
 .reaction-popover button .icon { width: 26px; height: 26px; }
 .reaction-popover button:hover { transform: translateY(-2px); background: var(--surface-hover); }
-.dock-btn[aria-expanded="true"] { background: var(--accent-wash); color: var(--accent); }
+.dock-btn[aria-expanded="true"] { background: var(--accent-wash); }
 
 .reaction-layer { position: absolute; z-index: 3; inset: 0; overflow: hidden; border-radius: inherit; pointer-events: none; }
 
@@ -1004,6 +1044,11 @@ kbd { min-width: 21px; display: inline-block; padding: 2px 4px; border: 1px soli
         box-shadow: var(--panel-shadow);
     }
 
+    .dock {
+        background-image: var(--glass-coat), linear-gradient(180deg, transparent 74%, var(--glass-reflection));
+        box-shadow: var(--panel-shadow), 0 5px 14px #10264d24;
+    }
+
     .dialog {
         border-color: var(--glass-edge);
         background-color: var(--glass-panel);
@@ -1071,11 +1116,43 @@ kbd { min-width: 21px; display: inline-block; padding: 2px 4px; border: 1px soli
     100% { opacity: 0; transform: translateY(-55px) scale(1.08); }
 }
 
-@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
-    .dock-btn:not(:disabled):not(:active):hover {
-        transform: translateY(-1px);
-        box-shadow: var(--lift-shadow);
+@media (min-width: 620px) and (hover: hover) and (pointer: fine) {
+    .dock-btn { min-height: 60px; padding-block: 6px 10px; }
+    .dock-art .icon { width: 36px; height: 36px; }
+    .dock-label { display: none; }
+
+    .dock-hint {
+        position: absolute;
+        bottom: calc(100% + 13px + var(--dock-lift, 0px));
+        left: 50%;
+        display: block;
+        padding: 6px 10px;
+        border: 1px solid var(--glass-edge);
+        border-radius: 8px;
+        background: var(--surface-raised);
+        box-shadow: 0 4px 14px #10264d33;
+        color: var(--text);
+        font-size: .76rem;
+        font-weight: 620;
+        opacity: 0;
+        pointer-events: none;
+        transform: translate(var(--dock-hint-x, -50%), 3px);
+        visibility: hidden;
+        transition: opacity 110ms ease, transform 160ms var(--ease-reveal);
     }
+
+    .dock:not(.hints-dismissed, :has(.reaction-popover:not([hidden]))) .dock-btn:is(:hover, :focus-visible) .dock-hint {
+        opacity: 1;
+        transform: translate(var(--dock-hint-x, -50%), 0);
+        visibility: visible;
+    }
+
+    .dock:has(.dock-btn:focus-visible) .dock-btn:not(:focus-visible) .dock-hint { visibility: hidden; }
+}
+
+@media (max-width: 760px) {
+    #mic-button .dock-hint { left: 0; --dock-hint-x: 0px; }
+    .leave-button .dock-hint { right: 0; left: auto; --dock-hint-x: 0px; }
 }
 
 @media (max-width: 840px) {
@@ -1164,12 +1241,7 @@ kbd { min-width: 21px; display: inline-block; padding: 2px 4px; border: 1px soli
     .video-tile { --avatar-size: 49px; --avatar-font: 1rem; }
     .inspector { width: 100%; }
     .chat-messages { max-height: 36vh; }
-    .meeting-footer { z-index: 4; padding-top: 6px; }
-    .dock { max-width: 100%; }
-    .dock-btn { min-width: 45px; min-height: 46px; padding: 4px 5px; font-size: .68rem; }
-    .dock-btn .icon { width: 19px; height: 19px; }
-    .leave-button { min-height: 44px; padding-inline: 9px; }
-    .leave-button .icon { width: 21px; height: 21px; }
+    .meeting-footer { padding-top: 6px; }
     .tile-actions { top: 5px; right: 5px; gap: 3px; }
     .tile-actions .icon-btn { min-height: 33px; min-width: 33px; }
     .tile-actions .icon { width: 15px; height: 15px; }
@@ -1179,9 +1251,24 @@ kbd { min-width: 21px; display: inline-block; padding: 2px 4px; border: 1px soli
     .meeting-actions { gap: 2px; }
     #invite-button { min-width: 32px; padding-inline: 5px; }
     #invite-button > :last-child { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-    .meeting-footer { gap: 7px; }
-    .dock { display: grid; width: min(100%, 295px); grid-template-columns: repeat(4, minmax(0, 1fr)); padding: 4px; }
-    .dock-btn { width: 100%; min-width: 0; padding-inline: 3px; }
+}
+
+@media (max-width: 480px) {
+    .dock {
+        display: grid;
+        width: min(100%, 332px);
+        grid-template-columns: repeat(10, minmax(0, 1fr));
+        gap: 2px;
+        padding: 4px 6px;
+        border-radius: 18px;
+    }
+
+    .dock > :is(.dock-btn, .reaction-control) { min-width: 0; grid-column: span 2; }
+    .dock > #people-button { grid-column: 2 / span 2; }
+    .dock-btn { width: 100%; min-height: 46px; padding: 2px 0 6px; }
+    .dock-art .icon { width: 24px; height: 24px; }
+    .leave-button { margin-inline-start: 0; }
+    .leave-button::before { display: none; }
 }
 
 @media (max-width: 380px) {
@@ -1207,6 +1294,7 @@ kbd { min-width: 21px; display: inline-block; padding: 2px 4px; border: 1px soli
 
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
+    .dock-art, .dock-btn:active .dock-art, .unread-badge { transform: none; scale: none; }
     .reaction-burst { animation: none !important; }
 }
 
@@ -1223,6 +1311,12 @@ kbd { min-width: 21px; display: inline-block; padding: 2px 4px; border: 1px soli
     .lobby-shell::after { content: none; }
     .lobby-content { background-image: none; }
     .stage { background: var(--stage); }
+    .dock { box-shadow: none; }
     .segmented, .inspector-tabs,
     input:not([type="checkbox"]):not([type="radio"]), textarea { background: var(--stage); }
+}
+
+@media (forced-colors: active) {
+    .dock-btn::after { background: ButtonText; forced-color-adjust: none; }
+    .dock-hint { border-color: ButtonText; }
 }

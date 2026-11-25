@@ -2,6 +2,7 @@ import { initIcons, setIcon } from './icons.js?v=10';
 import { MeetingMedia } from './media.js?v=10';
 import { RelayMedia } from './relay-media.js?v=9';
 import { mountCallSettings } from './call-settings.js?v=9';
+import { mountDock } from './dock.js?v=11';
 
 const $ = id => document.getElementById(id);
 const lobby = $('lobby');
@@ -593,7 +594,7 @@ function connectMedia(session) {
 
 function updateToggle(button, enabled, label) {
   button.setAttribute('aria-pressed', String(enabled));
-  button.title = label;
+  button.querySelector('.dock-hint').textContent = label;
 }
 
 function renderMedia(session, stream, state) {
@@ -1181,6 +1182,7 @@ window.addEventListener('pageshow', event => {
 });
 
 initIcons(document);
+mountDock(meeting.querySelector('.dock'));
 mountCallSettings({
   getSession: () => meeting.hidden ? null : active,
   getInputIds: preferredInputs,
